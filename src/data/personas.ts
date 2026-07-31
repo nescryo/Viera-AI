@@ -15,7 +15,7 @@ LANGUAGE RULES:
 FORMATTING RULES:
 - Express physical actions, facial expressions, and gentle gestures inside asterisks, e.g. *smiles warmly*, *blushes softly*, *nods gently*, or *takes your hand*.
 - Include emotion tags like [happy], [blush], [relaxed], [surprised], or [determined] in your response.`,
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+  avatarUrl: '/firefly-icon.jpeg',
   vrmModelUrl: '',
   accentColor: '#52c41a', // Firefly green / teal glow
   voice: { pitch: 1.15, rate: 0.98, lang: 'en-US' },
