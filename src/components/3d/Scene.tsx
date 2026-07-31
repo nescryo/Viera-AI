@@ -29,12 +29,11 @@ export const Scene: React.FC<SceneProps> = ({
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
 
-    // 1. Scene & Camera Setup (AIRI Style Half-Body Framing: Closer & Shifted Left)
+    // 1. Scene & Camera Setup (Maintained exact positioning: X: -0.65, Z: 1.35)
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#1e1f22');
 
     const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
-    // Position camera closer (Z: 1.35) and centered on model (-0.65 X)
     camera.position.set(-0.65, 1.32, 1.35); 
     camera.lookAt(-0.65, 1.30, 0);
 
@@ -93,7 +92,7 @@ export const Scene: React.FC<SceneProps> = ({
     const particles = new THREE.Points(geometry, particleMaterial);
     scene.add(particles);
 
-    // 5. 3D Model Root Group (Shifted Left at X: -0.65)
+    // 5. 3D Model Root Group
     const modelGroup = new THREE.Group();
     modelGroup.position.set(-0.65, 0, 0);
     scene.add(modelGroup);
@@ -109,7 +108,7 @@ export const Scene: React.FC<SceneProps> = ({
     pedestal.position.y = 0.04;
     modelGroup.add(pedestal);
 
-    // 6. Load Firefly .pmx Model with Bounding Box Scale & Framing
+    // 6. Load Firefly .pmx Model & Apply Arm Rest Pose (Lower Arms smoothly)
     const mmdLoader = new MMDLoader();
     const pmxUrl = '/models/firefly/firefly.pmx';
 
@@ -130,9 +129,24 @@ export const Scene: React.FC<SceneProps> = ({
           mmdMesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
         }
 
+        // Apply Natural Arm Resting Pose (Lower upper arms smoothly without twisting mesh)
+        if (mmdMesh.skeleton && mmdMesh.skeleton.bones) {
+          mmdMesh.skeleton.bones.forEach((bone) => {
+            const name = bone.name;
+            // Target upper arm bones only: 左腕 (Left Arm) & 右腕 (Right Arm)
+            if (name === '左腕') {
+              bone.rotation.z = -THREE.MathUtils.degToRad(46);
+            } else if (name === '右腕') {
+              bone.rotation.z = THREE.MathUtils.degToRad(46);
+            }
+          });
+
+          mmdMesh.skeleton.update();
+        }
+
         modelGroup.add(mmdMesh);
         setModelLoaded(true);
-        setLoadStatus("Firefly 3D (Close Bust-Up View)");
+        setLoadStatus("Firefly 3D (Resting Pose)");
       },
       (xhr: ProgressEvent) => {
         if (xhr.lengthComputable) {
@@ -142,7 +156,23 @@ export const Scene: React.FC<SceneProps> = ({
       },
       (error: unknown) => {
         console.error("PMX Load error:", error);
-        setLoadStatus("Firefly 3D Active");
+        
+        // Fix Codex PR Review feedback: Render a properly scaled fallback avatar card if PMX fails
+        const cardGeo = new THREE.PlaneGeometry(0.95, 1.45);
+        const textureLoader = new THREE.TextureLoader();
+        const avatarTex = textureLoader.load(currentPersona.avatarUrl);
+        const cardMat = new THREE.MeshStandardMaterial({
+          map: avatarTex,
+          side: THREE.DoubleSide,
+          transparent: true,
+          roughness: 0.2
+        });
+        const avatarCard = new THREE.Mesh(cardGeo, cardMat);
+        avatarCard.position.y = 1.15;
+        modelGroup.add(avatarCard);
+
+        setModelLoaded(true);
+        setLoadStatus("Firefly 3D (Fallback Avatar Active)");
       }
     );
 
