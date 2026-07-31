@@ -12,16 +12,89 @@ interface SceneProps {
   currentPersona: Persona;
   isSpeaking: boolean;
   currentEmotion: string;
+  onSelectEmotion?: (emotion: string) => void;
+}
+
+const TESTING_EMOTIONS = [
+  { id: 'happy', label: '😊 Happy' },
+  { id: 'blush', label: '😳 Blush' },
+  { id: 'relaxed', label: '😌 Relaxed' },
+  { id: 'surprised', label: '😮 Surprised' },
+  { id: 'angry', label: '😠 Angry' },
+  { id: 'sad', label: '😢 Sad' },
+  { id: 'neutral', label: '😐 Neutral' }
+];
+
+/**
+ * Creates a Soft Rose-Peach Anime Cheek Blush Texture
+ * Soft blended hue matching Firefly's fair porcelain white skin!
+ */
+function createSoftPorcelainCheekTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  if (ctx) {
+    ctx.clearRect(0, 0, 256, 256);
+
+    // 1. Soft Translucent Rose-Peach Radial Gradient
+    const gradient = ctx.createRadialGradient(128, 128, 6, 128, 128, 118);
+    gradient.addColorStop(0, 'rgba(255, 115, 135, 0.48)');
+    gradient.addColorStop(0.45, 'rgba(255, 155, 170, 0.25)');
+    gradient.addColorStop(0.8, 'rgba(255, 185, 195, 0.08)');
+    gradient.addColorStop(1, 'rgba(255, 185, 195, 0)');
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(128, 128, 118, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Delicate soft rose anime blush hatching lines
+    ctx.strokeStyle = 'rgba(230, 80, 100, 0.32)';
+    ctx.lineWidth = 3.0;
+
+    for (let x = 55; x <= 201; x += 18) {
+      const heightOffset = Math.sin(((x - 55) / 146) * Math.PI) * 40;
+      ctx.beginPath();
+      ctx.moveTo(x, 128 - heightOffset);
+      ctx.lineTo(x, 128 + heightOffset);
+      ctx.stroke();
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
 }
 
 export const Scene: React.FC<SceneProps> = ({
   currentPersona,
-  currentEmotion
+  currentEmotion,
+  onSelectEmotion
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const pointerRef = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
   const [modelLoaded, setModelLoaded] = useState(false);
   const [loadStatus, setLoadStatus] = useState<string>("Loading Firefly 3D Model...");
+
+  // Keep track of currentEmotion in ref to avoid re-loading 3D model on emotion changes
+  const currentEmotionRef = useRef(currentEmotion);
+  useEffect(() => {
+    currentEmotionRef.current = currentEmotion;
+  }, [currentEmotion]);
+
+  // Ref to hold loaded MMD mesh, bones, cheek blush materials, and morph target dictionary
+  const mmdMeshRef = useRef<THREE.SkinnedMesh | null>(null);
+  const upperBodyBoneRef = useRef<THREE.Bone | null>(null);
+  const neckBoneRef = useRef<THREE.Bone | null>(null);
+  const cheekMaterialsRef = useRef<THREE.MeshBasicMaterial[]>([]);
+
+  const blinkTimerRef = useRef<{ nextBlinkTime: number; isBlinking: boolean; blinkProgress: number }>({
+    nextBlinkTime: 0,
+    isBlinking: false,
+    blinkProgress: 0
+  });
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -40,14 +113,14 @@ export const Scene: React.FC<SceneProps> = ({
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-    // Pure Linear Tone Mapping (No harsh shadows or gloomy contrast)
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.LinearToneMapping;
 
     containerRef.current.innerHTML = '';
     containerRef.current.appendChild(renderer.domElement);
 
-    // 2. Bright & Cheerful Anime Lighting (No gloomy face shadows)
+    // 2. Bright & Cheerful Anime Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
     scene.add(ambientLight);
 
@@ -101,14 +174,20 @@ export const Scene: React.FC<SceneProps> = ({
     pedestal.position.y = 0.04;
     modelGroup.add(pedestal);
 
-    // 6. Load Firefly .pmx Model + Bright Bright Cheerful Anime Shading
+    // 6. Load Firefly .pmx Model
     const mmdLoader = new MMDLoader();
     const pmxUrl = '/models/firefly/firefly.pmx';
+    const softPorcelainCheekTex = createSoftPorcelainCheekTexture();
 
     mmdLoader.load(
       pmxUrl,
       (mmdMesh: THREE.SkinnedMesh) => {
         console.log("Loaded Firefly PMX 3D Model!", mmdMesh);
+        mmdMeshRef.current = mmdMesh;
+        cheekMaterialsRef.current = [];
+        
+        mmdMesh.castShadow = false;
+        mmdMesh.receiveShadow = false;
 
         // Auto-scale MMD model to standard human height
         const bbox = new THREE.Box3().setFromObject(mmdMesh);
@@ -119,7 +198,9 @@ export const Scene: React.FC<SceneProps> = ({
           mmdMesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
         }
 
-        // Apply Natural Arm Resting Pose
+        // Setup Bones & Natural Arm Resting Pose
+        let headBone: THREE.Bone | null = null;
+
         if (mmdMesh.skeleton && mmdMesh.skeleton.bones) {
           mmdMesh.skeleton.bones.forEach((bone) => {
             const name = bone.name;
@@ -127,13 +208,19 @@ export const Scene: React.FC<SceneProps> = ({
               bone.rotation.z = -THREE.MathUtils.degToRad(46);
             } else if (name === '右腕') {
               bone.rotation.z = THREE.MathUtils.degToRad(46);
+            } else if (name === '上半身' || name === '上半身2' || name === '胸') {
+              upperBodyBoneRef.current = bone;
+            } else if (name === '首') {
+              neckBoneRef.current = bone;
+            } else if (name === '頭' || name === 'head') {
+              headBone = bone;
             }
           });
 
           mmdMesh.skeleton.update();
         }
 
-        // Bright & Clean Material setup without gloomy shadows
+        // Clean and optimize materials
         mmdMesh.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
@@ -162,9 +249,39 @@ export const Scene: React.FC<SceneProps> = ({
           }
         });
 
+        // Create 2 Soft Porcelain Cheek Decals
+        const createCheekMesh = (xPos: number) => {
+          const mat = new THREE.MeshBasicMaterial({
+            map: softPorcelainCheekTex,
+            transparent: true,
+            opacity: 0,
+            depthTest: false,
+            side: THREE.DoubleSide
+          });
+          cheekMaterialsRef.current.push(mat);
+          const geo = new THREE.PlaneGeometry(0.68, 0.50);
+          const mesh = new THREE.Mesh(geo, mat);
+          
+          mesh.position.set(xPos, 0.35, 0.72);
+          mesh.rotation.y = xPos > 0 ? -0.22 : 0.22;
+          mesh.rotation.x = -0.06;
+          return mesh;
+        };
+
+        const leftCheek = createCheekMesh(-0.42);
+        const rightCheek = createCheekMesh(0.42);
+
+        if (headBone) {
+          (headBone as THREE.Bone).add(leftCheek);
+          (headBone as THREE.Bone).add(rightCheek);
+        } else {
+          modelGroup.add(leftCheek);
+          modelGroup.add(rightCheek);
+        }
+
         modelGroup.add(mmdMesh);
         setModelLoaded(true);
-        setLoadStatus("Firefly 3D (Bright Anime Render)");
+        setLoadStatus("Firefly 3D (Strict Separated Facial Morphs Active)");
       },
       (xhr: ProgressEvent) => {
         if (xhr.lengthComputable) {
@@ -216,24 +333,159 @@ export const Scene: React.FC<SceneProps> = ({
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('touchmove', onTouchMove);
 
-    // 8. Animation Loop
+    // 8. High-Performance Animation Loop
     let animationFrameId: number;
     let clock = new THREE.Clock();
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
       const elapsedTime = clock.getElapsedTime();
+      const emo = currentEmotionRef.current;
 
-      // Smooth pointer tracking
+      // Smooth pointer tracking (Mouse / Touch)
       pointerRef.current.x += (pointerRef.current.targetX - pointerRef.current.x) * 0.05;
       pointerRef.current.y += (pointerRef.current.targetY - pointerRef.current.y) * 0.05;
 
       modelGroup.rotation.y = pointerRef.current.x * 0.35;
       modelGroup.rotation.x = -pointerRef.current.y * 0.2;
 
-      // Gentle breathing idle motion
-      modelGroup.position.y = Math.sin(elapsedTime * 2.2) * 0.012;
+      // ORGANIC CHEST BREATHING BONE ANIMATION
+      const breathPhase = Math.sin(elapsedTime * 2.2);
+      
+      modelGroup.position.y = breathPhase * 0.003; 
+
+      if (upperBodyBoneRef.current) {
+        upperBodyBoneRef.current.rotation.x = breathPhase * 0.015;
+      }
+      
+      if (neckBoneRef.current) {
+        neckBoneRef.current.rotation.x = -breathPhase * 0.008;
+      }
+
       particles.rotation.y = elapsedTime * 0.04;
+
+      // AUTOMATIC EYE BLINKING ENGINE
+      if (mmdMeshRef.current && mmdMeshRef.current.morphTargetDictionary && mmdMeshRef.current.morphTargetInfluences) {
+        const dict = mmdMeshRef.current.morphTargetDictionary;
+        const influences = mmdMeshRef.current.morphTargetInfluences;
+
+        const getMorphIdx = (name: string) => dict[name];
+
+        const blinkIndex = getMorphIdx('まばたき') ?? getMorphIdx('blink') ?? getMorphIdx('まばたき鏡');
+
+        if (blinkIndex !== undefined) {
+          if (elapsedTime > blinkTimerRef.current.nextBlinkTime && !blinkTimerRef.current.isBlinking) {
+            blinkTimerRef.current.isBlinking = true;
+            blinkTimerRef.current.blinkProgress = 0;
+          }
+
+          if (blinkTimerRef.current.isBlinking) {
+            blinkTimerRef.current.blinkProgress += 0.08;
+            const blinkWeight = Math.sin(blinkTimerRef.current.blinkProgress * Math.PI);
+            influences[blinkIndex] = Math.max(0, blinkWeight);
+
+            if (blinkTimerRef.current.blinkProgress >= 1.0) {
+              blinkTimerRef.current.isBlinking = false;
+              influences[blinkIndex] = 0;
+              blinkTimerRef.current.nextBlinkTime = elapsedTime + 3.5 + Math.random() * 2.0;
+            }
+          }
+        }
+
+        // --- EXPLICIT SEPARATED MORPH TARGET LOOKUPS ---
+        const morphSmileMouth  = getMorphIdx('口角上げ') ?? getMorphIdx('あ');
+        const morphOpenMouth   = getMorphIdx('あ') ?? getMorphIdx('い');
+        const morphSmallMouth  = getMorphIdx('ん') ?? getMorphIdx('へ');
+        const morphFrownMouth  = getMorphIdx('口角下げ') ?? getMorphIdx('▲') ?? getMorphIdx('△');
+        const morphSurprisedMouth = getMorphIdx('お') ?? getMorphIdx('ワ');
+
+        const morphRelaxedEye  = getMorphIdx('じと目') ?? getMorphIdx('笑い');
+        const morphRelaxedEyebrow = getMorphIdx('にこり') ?? getMorphIdx('下');
+
+        const morphAngryEyebrow = getMorphIdx('怒り') ?? getMorphIdx('真面目');
+        const morphAngryEye     = getMorphIdx('じと目') ?? getMorphIdx('怒り');
+
+        const morphSadEyebrow   = getMorphIdx('困る') ?? getMorphIdx('悲しい');
+        const morphSadEye       = getMorphIdx('じと目');
+
+        const morphSurprisedEye = getMorphIdx('びっくり') ?? getMorphIdx('目大');
+        const morphSurprisedEyebrow = getMorphIdx('上');
+
+        // Reset all Target Weights to 0
+        let targetSmileMouth = 0;
+        let targetOpenMouth = 0;
+        let targetSmallMouth = 0;
+        let targetFrownMouth = 0;
+        let targetSurprisedMouth = 0;
+
+        let targetRelaxedEye = 0;
+        let targetRelaxedEyebrow = 0;
+        let targetAngryEyebrow = 0;
+        let targetAngryEye = 0;
+        let targetSadEyebrow = 0;
+        let targetSadEye = 0;
+        let targetSurprisedEye = 0;
+        let targetSurprisedEyebrow = 0;
+
+        // CALIBRATION PER EMOTION
+        if (emo === 'happy') {
+          // HAPPY: Wide open-eye smile with mouth corner lift & open mouth! (Eyes open & sparkling!)
+          targetSmileMouth = 0.55;
+          targetOpenMouth = 0.35;
+          targetRelaxedEyebrow = 0.25;
+        } else if (emo === 'blush') {
+          targetSmallMouth = 0.45;
+          targetSadEyebrow = 0.35;
+        } else if (emo === 'relaxed') {
+          // RELAXED: Gentle thin smile + soft relaxed eyebrows + soft eyes!
+          targetSmileMouth = 0.35;
+          targetRelaxedEyebrow = 0.45;
+          targetRelaxedEye = 0.15;
+        } else if (emo === 'surprised') {
+          targetSurprisedEye = 0.85;
+          targetSurprisedEyebrow = 0.75;
+          targetSurprisedMouth = 0.65;
+        } else if (emo === 'angry') {
+          targetAngryEyebrow = 0.95;
+          targetAngryEye = 0.55;
+          targetFrownMouth = 0.85;
+          targetSmallMouth = 0.45;
+        } else if (emo === 'sad') {
+          targetSadEyebrow = 0.85;
+          targetSadEye = 0.45;
+          targetFrownMouth = 0.75;
+          targetSmallMouth = 0.35;
+        }
+
+        // Smoothly fade soft rose-peach cheekbone blush
+        const targetCheekOpacity = emo === 'blush' ? 0.65 : 0;
+        cheekMaterialsRef.current.forEach((mat) => {
+          mat.opacity += (targetCheekOpacity - mat.opacity) * 0.15;
+        });
+
+        // Apply smooth Lerp transitions across all morphs
+        if (morphSmileMouth !== undefined) influences[morphSmileMouth] += (targetSmileMouth - influences[morphSmileMouth]) * 0.15;
+        if (morphOpenMouth !== undefined && morphOpenMouth !== morphSmileMouth) influences[morphOpenMouth] += (targetOpenMouth - influences[morphOpenMouth]) * 0.15;
+        if (morphSmallMouth !== undefined) influences[morphSmallMouth] += (targetSmallMouth - influences[morphSmallMouth]) * 0.15;
+        if (morphFrownMouth !== undefined) influences[morphFrownMouth] += (targetFrownMouth - influences[morphFrownMouth]) * 0.15;
+        if (morphSurprisedMouth !== undefined) influences[morphSurprisedMouth] += (targetSurprisedMouth - influences[morphSurprisedMouth]) * 0.15;
+
+        if (morphRelaxedEye !== undefined) influences[morphRelaxedEye] += (targetRelaxedEye - influences[morphRelaxedEye]) * 0.15;
+        if (morphRelaxedEyebrow !== undefined) influences[morphRelaxedEyebrow] += (targetRelaxedEyebrow - influences[morphRelaxedEyebrow]) * 0.15;
+
+        if (morphSurprisedEye !== undefined) influences[morphSurprisedEye] += (targetSurprisedEye - influences[morphSurprisedEye]) * 0.15;
+        if (morphSurprisedEyebrow !== undefined) influences[morphSurprisedEyebrow] += (targetSurprisedEyebrow - influences[morphSurprisedEyebrow]) * 0.15;
+
+        if (morphAngryEyebrow !== undefined) influences[morphAngryEyebrow] += (targetAngryEyebrow - influences[morphAngryEyebrow]) * 0.15;
+        if (morphAngryEye !== undefined) influences[morphAngryEye] += (targetAngryEye - influences[morphAngryEye]) * 0.15;
+
+        if (morphSadEyebrow !== undefined && morphSadEyebrow !== morphAngryEyebrow) {
+          influences[morphSadEyebrow] += (targetSadEyebrow - influences[morphSadEyebrow]) * 0.15;
+        }
+        if (morphSadEye !== undefined && morphSadEye !== morphAngryEye) {
+          influences[morphSadEye] += (targetSadEye - influences[morphSadEye]) * 0.15;
+        }
+      }
 
       renderer.render(scene, camera);
     };
@@ -272,6 +524,20 @@ export const Scene: React.FC<SceneProps> = ({
         <span className="current-emotion-badge">
           Expression: {currentEmotion || 'Neutral'}
         </span>
+
+        {/* Temporary Emotion Testing Chips */}
+        <div className="testing-emotions-bar">
+          <span className="testing-label">Test Expression:</span>
+          {TESTING_EMOTIONS.map((emo) => (
+            <button
+              key={emo.id}
+              className={`emotion-test-btn ${currentEmotion === emo.id ? 'active' : ''}`}
+              onClick={() => onSelectEmotion?.(emo.id)}
+            >
+              {emo.label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
