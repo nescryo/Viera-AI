@@ -29,7 +29,7 @@ export const Scene: React.FC<SceneProps> = ({
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
 
-    // 1. Scene & Camera Setup (Maintained exact positioning: X: -0.65, Z: 1.35)
+    // 1. Scene & Camera Setup (AIRI Style Half-Body Framing: X: -0.65, Z: 1.35)
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#1e1f22');
 
@@ -40,38 +40,31 @@ export const Scene: React.FC<SceneProps> = ({
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    // Pure Linear Tone Mapping (No harsh shadows or gloomy contrast)
+    renderer.toneMapping = THREE.LinearToneMapping;
 
     containerRef.current.innerHTML = '';
     containerRef.current.appendChild(renderer.domElement);
 
-    // 2. Anime & Firefly Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.25);
+    // 2. Bright & Cheerful Anime Lighting (No gloomy face shadows)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
     scene.add(ambientLight);
 
-    const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
-    mainLight.position.set(2, 4, 3);
-    mainLight.castShadow = true;
-    scene.add(mainLight);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.45);
+    keyLight.position.set(2, 4, 3);
+    scene.add(keyLight);
 
-    const rimLight = new THREE.DirectionalLight(
-      new THREE.Color(currentPersona.accentColor || '#52c41a'), 
-      2.0
-    );
-    rimLight.position.set(-3, 3, -2);
-    scene.add(rimLight);
-
-    const fillLight = new THREE.DirectionalLight(0x70d6ff, 0.6);
-    fillLight.position.set(0, -2, 2);
-    scene.add(fillLight);
+    const frontLight = new THREE.DirectionalLight(0xffffff, 0.35);
+    frontLight.position.set(-0.65, 1.5, 4);
+    scene.add(frontLight);
 
     // 3. Ground Pedestal & Grid
     const gridHelper = new THREE.GridHelper(10, 20, 0x52c41a, 0x2b2d31);
     gridHelper.position.set(-0.65, 0, 0);
     scene.add(gridHelper);
 
-    // 4. Floating Particles
+    // 4. Floating Firefly Particles
     const particleCount = 180;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
@@ -101,14 +94,14 @@ export const Scene: React.FC<SceneProps> = ({
     const pedestalGeo = new THREE.CylinderGeometry(0.8, 0.9, 0.08, 32);
     const pedestalMat = new THREE.MeshStandardMaterial({
       color: 0x2b2d31,
-      roughness: 0.3,
-      metalness: 0.8
+      roughness: 0.5,
+      metalness: 0.6
     });
     const pedestal = new THREE.Mesh(pedestalGeo, pedestalMat);
     pedestal.position.y = 0.04;
     modelGroup.add(pedestal);
 
-    // 6. Load Firefly .pmx Model & Apply Arm Rest Pose (Lower Arms smoothly)
+    // 6. Load Firefly .pmx Model + Bright Bright Cheerful Anime Shading
     const mmdLoader = new MMDLoader();
     const pmxUrl = '/models/firefly/firefly.pmx';
 
@@ -116,9 +109,6 @@ export const Scene: React.FC<SceneProps> = ({
       pmxUrl,
       (mmdMesh: THREE.SkinnedMesh) => {
         console.log("Loaded Firefly PMX 3D Model!", mmdMesh);
-        
-        mmdMesh.castShadow = true;
-        mmdMesh.receiveShadow = true;
 
         // Auto-scale MMD model to standard human height
         const bbox = new THREE.Box3().setFromObject(mmdMesh);
@@ -129,11 +119,10 @@ export const Scene: React.FC<SceneProps> = ({
           mmdMesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
         }
 
-        // Apply Natural Arm Resting Pose (Lower upper arms smoothly without twisting mesh)
+        // Apply Natural Arm Resting Pose
         if (mmdMesh.skeleton && mmdMesh.skeleton.bones) {
           mmdMesh.skeleton.bones.forEach((bone) => {
             const name = bone.name;
-            // Target upper arm bones only: 左腕 (Left Arm) & 右腕 (Right Arm)
             if (name === '左腕') {
               bone.rotation.z = -THREE.MathUtils.degToRad(46);
             } else if (name === '右腕') {
@@ -144,9 +133,38 @@ export const Scene: React.FC<SceneProps> = ({
           mmdMesh.skeleton.update();
         }
 
+        // Bright & Clean Material setup without gloomy shadows
+        mmdMesh.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            mesh.castShadow = false;
+            mesh.receiveShadow = false;
+
+            const optimizeMaterial = (mat: THREE.Material) => {
+              if ('color' in mat && mat.color) {
+                (mat as any).color.setHex(0xffffff);
+              }
+              if ('emissive' in mat && (mat as any).emissive) {
+                (mat as any).emissive.setHex(0x000000);
+              }
+              if ('roughness' in mat) {
+                (mat as any).roughness = 0.8;
+              }
+              mat.needsUpdate = true;
+              return mat;
+            };
+
+            if (Array.isArray(mesh.material)) {
+              mesh.material.forEach((m) => optimizeMaterial(m));
+            } else if (mesh.material) {
+              optimizeMaterial(mesh.material);
+            }
+          }
+        });
+
         modelGroup.add(mmdMesh);
         setModelLoaded(true);
-        setLoadStatus("Firefly 3D (Resting Pose)");
+        setLoadStatus("Firefly 3D (Bright Anime Render)");
       },
       (xhr: ProgressEvent) => {
         if (xhr.lengthComputable) {
@@ -157,7 +175,7 @@ export const Scene: React.FC<SceneProps> = ({
       (error: unknown) => {
         console.error("PMX Load error:", error);
         
-        // Fix Codex PR Review feedback: Render a properly scaled fallback avatar card if PMX fails
+        // Fallback avatar card
         const cardGeo = new THREE.PlaneGeometry(0.95, 1.45);
         const textureLoader = new THREE.TextureLoader();
         const avatarTex = textureLoader.load(currentPersona.avatarUrl);
