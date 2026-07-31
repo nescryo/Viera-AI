@@ -1,0 +1,48 @@
+export type SenderType = 'user' | 'ai';
+
+export interface ChatMessage {
+  id: string;
+  sender: SenderType;
+  characterId: string;
+  text: string;
+  emotions?: string[];
+  actions?: string[];
+  timestamp: string;
+  swipes?: string[];
+  activeSwipeIndex?: number;
+  isAudioPlaying?: boolean;
+}
+
+export interface Persona {
+  id: string;
+  name: string;
+  tagline: string;
+  greeting: string;
+  systemPrompt: string;
+  avatarUrl: string;
+  vrmModelUrl?: string;
+  accentColor: string;
+  voice: {
+    pitch: number;
+    rate: number;
+    lang: string;
+  };
+  category: 'Honkai: Star Rail' | 'Anime & Gaming' | 'Original';
+}
+
+export type ApiProvider = 'lmstudio' | 'gemini' | 'openrouter' | 'mock';
+
+export interface ApiConfig {
+  provider: ApiProvider;
+  lmStudioUrl: string;
+  lmStudioModel: string;
+  geminiApiKey: string;
+  openRouterApiKey: string;
+  openRouterModel: string;
+}
+
+export interface ExpressionState {
+  currentEmotion: string;
+  intensity: number;
+  isSpeaking: boolean;
+}
