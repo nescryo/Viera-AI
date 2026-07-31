@@ -29,9 +29,52 @@
   bottom: 24px;
   left: 24px;
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
   z-index: 5;
-  pointer-events: none;
+  pointer-events: auto;
+}
+
+.testing-emotions-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(30, 31, 34, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.testing-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.emotion-test-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.emotion-test-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-normal);
+}
+
+.emotion-test-btn.active {
+  background: var(--accent-blurple);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 0 10px rgba(88, 101, 242, 0.4);
 }
 
 .live-vrm-badge, .current-emotion-badge {

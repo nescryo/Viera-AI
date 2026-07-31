@@ -111,6 +111,7 @@ export function App() {
         currentPersona={currentPersona}
         isSpeaking={isSpeaking}
         currentEmotion={currentEmotion}
+        onSelectEmotion={(emotion) => setCurrentEmotion(emotion)}
       />
 
       <Header
