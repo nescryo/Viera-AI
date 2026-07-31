@@ -27,7 +27,6 @@ const TESTING_EMOTIONS = [
 
 /**
  * Creates a Soft Rose-Peach Anime Cheek Blush Texture
- * Soft blended hue matching Firefly's fair porcelain white skin!
  */
 function createSoftPorcelainCheekTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
@@ -38,7 +37,6 @@ function createSoftPorcelainCheekTexture(): THREE.CanvasTexture {
   if (ctx) {
     ctx.clearRect(0, 0, 256, 256);
 
-    // 1. Soft Translucent Rose-Peach Radial Gradient
     const gradient = ctx.createRadialGradient(128, 128, 6, 128, 128, 118);
     gradient.addColorStop(0, 'rgba(255, 115, 135, 0.48)');
     gradient.addColorStop(0.45, 'rgba(255, 155, 170, 0.25)');
@@ -50,7 +48,6 @@ function createSoftPorcelainCheekTexture(): THREE.CanvasTexture {
     ctx.arc(128, 128, 118, 0, Math.PI * 2);
     ctx.fill();
 
-    // 2. Delicate soft rose anime blush hatching lines
     ctx.strokeStyle = 'rgba(230, 80, 100, 0.32)';
     ctx.lineWidth = 3.0;
 
@@ -78,16 +75,21 @@ export const Scene: React.FC<SceneProps> = ({
   const [modelLoaded, setModelLoaded] = useState(false);
   const [loadStatus, setLoadStatus] = useState<string>("Loading Firefly 3D Model...");
 
-  // Keep track of currentEmotion in ref to avoid re-loading 3D model on emotion changes
+  // Keep track of currentEmotion in ref
   const currentEmotionRef = useRef(currentEmotion);
   useEffect(() => {
     currentEmotionRef.current = currentEmotion;
   }, [currentEmotion]);
 
-  // Ref to hold loaded MMD mesh, bones, cheek blush materials, and morph target dictionary
+  // Ref to hold loaded MMD mesh, bones, physics spring bones, and materials
   const mmdMeshRef = useRef<THREE.SkinnedMesh | null>(null);
   const upperBodyBoneRef = useRef<THREE.Bone | null>(null);
   const neckBoneRef = useRef<THREE.Bone | null>(null);
+  const headBoneRef = useRef<THREE.Bone | null>(null);
+  
+  // Dynamic Physics / Spring Bone references for Hair & Skirt
+  const hairBonesRef = useRef<{ bone: THREE.Bone; baseRotZ: number; baseRotX: number; phase: number }[]>([]);
+  const skirtBonesRef = useRef<{ bone: THREE.Bone; baseRotZ: number; baseRotX: number; phase: number }[]>([]);
   const cheekMaterialsRef = useRef<THREE.MeshBasicMaterial[]>([]);
 
   const blinkTimerRef = useRef<{ nextBlinkTime: number; isBlinking: boolean; blinkProgress: number }>({
@@ -174,7 +176,7 @@ export const Scene: React.FC<SceneProps> = ({
     pedestal.position.y = 0.04;
     modelGroup.add(pedestal);
 
-    // 6. Load Firefly .pmx Model
+    // 6. Load Firefly .pmx Model + Setup Torso & Head Bone Mouse Tracking & MMD Hair/Skirt Physics
     const mmdLoader = new MMDLoader();
     const pmxUrl = '/models/firefly/firefly.pmx';
     const softPorcelainCheekTex = createSoftPorcelainCheekTexture();
@@ -185,6 +187,8 @@ export const Scene: React.FC<SceneProps> = ({
         console.log("Loaded Firefly PMX 3D Model!", mmdMesh);
         mmdMeshRef.current = mmdMesh;
         cheekMaterialsRef.current = [];
+        hairBonesRef.current = [];
+        skirtBonesRef.current = [];
         
         mmdMesh.castShadow = false;
         mmdMesh.receiveShadow = false;
@@ -198,12 +202,14 @@ export const Scene: React.FC<SceneProps> = ({
           mmdMesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
         }
 
-        // Setup Bones & Natural Arm Resting Pose
+        // Setup Skeleton, Torso/Head Isolated Tracking, & Hair/Skirt Physics Bones
         let headBone: THREE.Bone | null = null;
 
         if (mmdMesh.skeleton && mmdMesh.skeleton.bones) {
-          mmdMesh.skeleton.bones.forEach((bone) => {
+          mmdMesh.skeleton.bones.forEach((bone, index) => {
             const name = bone.name;
+            
+            // Natural Arm Resting Pose
             if (name === '左腕') {
               bone.rotation.z = -THREE.MathUtils.degToRad(46);
             } else if (name === '右腕') {
@@ -214,6 +220,27 @@ export const Scene: React.FC<SceneProps> = ({
               neckBoneRef.current = bone;
             } else if (name === '頭' || name === 'head') {
               headBone = bone;
+              headBoneRef.current = bone;
+            }
+
+            // Identify Hair Bones for Spring Physics
+            if (name.includes('髪') || name.includes('毛') || name.includes('hair') || name.includes('ツインテ') || name.includes('リボン')) {
+              hairBonesRef.current.push({
+                bone,
+                baseRotZ: bone.rotation.z,
+                baseRotX: bone.rotation.x,
+                phase: index * 0.4
+              });
+            }
+
+            // Identify Skirt Bones for Secondary Motion Physics
+            if (name.includes('スカート') || name.includes('skirt') || name.includes('裾')) {
+              skirtBonesRef.current.push({
+                bone,
+                baseRotZ: bone.rotation.z,
+                baseRotX: bone.rotation.x,
+                phase: index * 0.3
+              });
             }
           });
 
@@ -249,7 +276,7 @@ export const Scene: React.FC<SceneProps> = ({
           }
         });
 
-        // Create 2 Soft Porcelain Cheek Decals
+        // Create 2 Soft Porcelain Cheek Decals attached to Head Bone
         const createCheekMesh = (xPos: number) => {
           const mat = new THREE.MeshBasicMaterial({
             map: softPorcelainCheekTex,
@@ -281,7 +308,7 @@ export const Scene: React.FC<SceneProps> = ({
 
         modelGroup.add(mmdMesh);
         setModelLoaded(true);
-        setLoadStatus("Firefly 3D (Strict Separated Facial Morphs Active)");
+        setLoadStatus("Firefly 3D (Isolated Torso Tracking & Dynamic Physics Active)");
       },
       (xhr: ProgressEvent) => {
         if (xhr.lengthComputable) {
@@ -333,7 +360,7 @@ export const Scene: React.FC<SceneProps> = ({
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('touchmove', onTouchMove);
 
-    // 8. High-Performance Animation Loop
+    // 8. High-Performance Animation Loop with Torso/Head Mouse Tracking & Dynamic Hair/Skirt Physics
     let animationFrameId: number;
     let clock = new THREE.Clock();
 
@@ -342,25 +369,62 @@ export const Scene: React.FC<SceneProps> = ({
       const elapsedTime = clock.getElapsedTime();
       const emo = currentEmotionRef.current;
 
-      // Smooth pointer tracking (Mouse / Touch)
+      // Smooth pointer tracking interpolation
       pointerRef.current.x += (pointerRef.current.targetX - pointerRef.current.x) * 0.05;
       pointerRef.current.y += (pointerRef.current.targetY - pointerRef.current.y) * 0.05;
 
-      modelGroup.rotation.y = pointerRef.current.x * 0.35;
-      modelGroup.rotation.x = -pointerRef.current.y * 0.2;
+      const pX = pointerRef.current.x;
+      const pY = pointerRef.current.y;
+
+      // POIN 5 UPGRADE: KEEP LOWER BODY (PEDESTAL & LEGS) 100% GROUNDED & STILL!
+      // Whole model root stays fixed on pedestal!
+      modelGroup.rotation.y = 0;
+      modelGroup.rotation.x = 0;
+
+      // ISOLATED MOUSE TRACKING: ONLY TORSO, NECK & HEAD ROTATE TOWARDS CURSOR!
+      const targetTorsoYaw = pX * 0.18;
+      const targetTorsoPitch = -pY * 0.08;
+
+      const targetHeadYaw = pX * 0.32;
+      const targetHeadPitch = -pY * 0.16;
 
       // ORGANIC CHEST BREATHING BONE ANIMATION
       const breathPhase = Math.sin(elapsedTime * 2.2);
-      
       modelGroup.position.y = breathPhase * 0.003; 
 
       if (upperBodyBoneRef.current) {
-        upperBodyBoneRef.current.rotation.x = breathPhase * 0.015;
+        upperBodyBoneRef.current.rotation.y += (targetTorsoYaw - upperBodyBoneRef.current.rotation.y) * 0.1;
+        upperBodyBoneRef.current.rotation.x = (breathPhase * 0.015) + (targetTorsoPitch * 0.5);
       }
-      
+
       if (neckBoneRef.current) {
-        neckBoneRef.current.rotation.x = -breathPhase * 0.008;
+        neckBoneRef.current.rotation.y += ((targetHeadYaw * 0.5) - neckBoneRef.current.rotation.y) * 0.1;
+        neckBoneRef.current.rotation.x = (-breathPhase * 0.008) + (targetHeadPitch * 0.5);
       }
+
+      if (headBoneRef.current) {
+        headBoneRef.current.rotation.y += ((targetHeadYaw * 0.5) - headBoneRef.current.rotation.y) * 0.1;
+        headBoneRef.current.rotation.x += ((targetHeadPitch * 0.5) - headBoneRef.current.rotation.x) * 0.1;
+      }
+
+      // POIN 4: MMD DYNAMIC BONES & ORGANIC SPRING PHYSICS FOR HAIR & SKIRT
+      // Silky smooth secondary sway for Firefly's long silver hair & ribbon
+      hairBonesRef.current.forEach(({ bone, baseRotZ, baseRotX, phase }) => {
+        const hairSwayZ = Math.sin(elapsedTime * 2.5 + phase) * 0.04 + (targetHeadYaw * 0.12);
+        const hairSwayX = Math.cos(elapsedTime * 2.0 + phase) * 0.025 + (targetHeadPitch * 0.08);
+        
+        bone.rotation.z = baseRotZ + hairSwayZ;
+        bone.rotation.x = baseRotX + hairSwayX;
+      });
+
+      // Secondary movement physics for Firefly's skirt
+      skirtBonesRef.current.forEach(({ bone, baseRotZ, baseRotX, phase }) => {
+        const skirtSwayZ = Math.sin(elapsedTime * 2.2 + phase) * 0.015;
+        const skirtSwayX = Math.cos(elapsedTime * 1.8 + phase) * 0.010;
+
+        bone.rotation.z = baseRotZ + skirtSwayZ;
+        bone.rotation.x = baseRotX + skirtSwayX;
+      });
 
       particles.rotation.y = elapsedTime * 0.04;
 
@@ -392,7 +456,7 @@ export const Scene: React.FC<SceneProps> = ({
           }
         }
 
-        // --- EXPLICIT SEPARATED MORPH TARGET LOOKUPS ---
+        // Morph Target Lookups
         const morphSmileMouth  = getMorphIdx('口角上げ') ?? getMorphIdx('あ');
         const morphOpenMouth   = getMorphIdx('あ') ?? getMorphIdx('い');
         const morphSmallMouth  = getMorphIdx('ん') ?? getMorphIdx('へ');
@@ -411,7 +475,6 @@ export const Scene: React.FC<SceneProps> = ({
         const morphSurprisedEye = getMorphIdx('びっくり') ?? getMorphIdx('目大');
         const morphSurprisedEyebrow = getMorphIdx('上');
 
-        // Reset all Target Weights to 0
         let targetSmileMouth = 0;
         let targetOpenMouth = 0;
         let targetSmallMouth = 0;
@@ -427,9 +490,7 @@ export const Scene: React.FC<SceneProps> = ({
         let targetSurprisedEye = 0;
         let targetSurprisedEyebrow = 0;
 
-        // CALIBRATION PER EMOTION
         if (emo === 'happy') {
-          // HAPPY: Wide open-eye smile with mouth corner lift & open mouth! (Eyes open & sparkling!)
           targetSmileMouth = 0.55;
           targetOpenMouth = 0.35;
           targetRelaxedEyebrow = 0.25;
@@ -437,7 +498,6 @@ export const Scene: React.FC<SceneProps> = ({
           targetSmallMouth = 0.45;
           targetSadEyebrow = 0.35;
         } else if (emo === 'relaxed') {
-          // RELAXED: Gentle thin smile + soft relaxed eyebrows + soft eyes!
           targetSmileMouth = 0.35;
           targetRelaxedEyebrow = 0.45;
           targetRelaxedEye = 0.15;
@@ -457,7 +517,7 @@ export const Scene: React.FC<SceneProps> = ({
           targetSmallMouth = 0.35;
         }
 
-        // Smoothly fade soft rose-peach cheekbone blush
+        // Smoothly fade cheekbone blush
         const targetCheekOpacity = emo === 'blush' ? 0.65 : 0;
         cheekMaterialsRef.current.forEach((mat) => {
           mat.opacity += (targetCheekOpacity - mat.opacity) * 0.15;
