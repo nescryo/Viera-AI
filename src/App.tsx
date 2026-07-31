@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ChatMessage, Persona, ApiConfig } from './types';
-import { PERSONA_PRESETS } from './data/personas';
+import { FIREFLY_PERSONA } from './data/personas';
 import { sendChatMessage, parseResponseText } from './services/aiService';
 import { ttsService } from './services/ttsService';
 
@@ -13,8 +13,8 @@ import { Scene } from './components/3d/Scene';
 import './App.css';
 
 export function App() {
-  // Single dedicated 3D Roleplay Character
-  const [currentPersona] = useState<Persona>(PERSONA_PRESETS[0]); // March 7th
+  // Single dedicated 3D Roleplay Character: Firefly
+  const [currentPersona] = useState<Persona>(FIREFLY_PERSONA);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);

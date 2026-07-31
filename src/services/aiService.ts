@@ -53,33 +53,31 @@ export async function sendChatMessage(
       return data.choices?.[0]?.message?.content || "*smiles softly* (No response content)";
     } catch (err) {
       console.warn("LM Studio connection failed, falling back to built-in Roleplay Engine:", err);
-      return generateMockRoleplayResponse(persona, messages[messages.length - 1]?.text || '');
+      return generateMockRoleplayResponse(messages[messages.length - 1]?.text || '');
     }
   }
 
-  return generateMockRoleplayResponse(persona, messages[messages.length - 1]?.text || '');
+  return generateMockRoleplayResponse(messages[messages.length - 1]?.text || '');
 }
 
-function generateMockRoleplayResponse(persona: Persona, lastUserText: string): string {
+function generateMockRoleplayResponse(lastUserText: string): string {
   const lower = lastUserText.toLowerCase();
 
-  if (persona.id === 'march7th') {
-    if (lower.includes('hello') || lower.includes('hi') || lower.includes('halo')) {
-      return "*snaps a quick photo with her pink camera* [happy] Hey there! I was just organizing my photo album from Belobog. Wanna see the cute photos I took of Dan Heng looking serious?";
-    }
-    return "*taps her chin thoughtfully* [excited] Ooh, that sounds like an awesome idea! Should we ask Mr. Yang and Himeko if we can visit that planet next? I bet there are super cool scenes to take pictures of!";
+  // Indonesian greetings
+  if (lower.includes('halo') || lower.includes('hai') || lower.includes('apa kabar') || lower.includes('lagi apa')) {
+    return "*tersenyum lembut dan melambaikan tangan kecilnya* [happy] Halo! Aku senang sekali bisa mengobrol denganmu lagi. Hari ini kamu sudah makan kue yang manis belum? Mau jalan-jalan ke Secret Base-ku di Penacony?";
   }
 
-  if (persona.id === 'kafka') {
-    if (lower.includes('hello') || lower.includes('hi') || lower.includes('halo')) {
-      return "*glances up with a gentle, hypnotic smile* [relaxed] Hello, little one. I was wondering when you'd drop by. Everything is going smoothly, just as Elio predicted.";
-    }
-    return "*smiles softly, adjusting her coat collar* [smirk] How intriguing... You always find ways to surprise me. Tell me more, I'm listening closely.";
+  // English greetings
+  if (lower.includes('hello') || lower.includes('hi') || lower.includes('how are you')) {
+    return "*smiles warmly with gentle eyes, waving slightly* [happy] Hello Trailblazer! I'm so happy to see you today. Have you had anything sweet to eat yet? Let's spend some peaceful time together!";
   }
 
-  if (persona.id === 'silverwolf') {
-    return "*blowing a purple bubblegum bubble, eyes glued to her gaming screen* [bored] Yeah yeah, I hear you. Just give me 10 seconds to finish this boss fight... *clicks button rapid-fire* Boom! Clear! Now, what cheat code do you need today?";
+  // Indonesian questions
+  if (lower.includes('siapa kamu') || lower.includes('kamu siapa') || lower.includes('cerita')) {
+    return "*menatapmu dengan tatapan hangat* [relaxed] Aku Firefly... AR-26710 dari Stellaron Hunters. Tapi di depanmu, aku cuma Firefly yang ingin membuat kenangan indah bersama Trailblazer. Ada yang ingin kamu ceritakan padaku?";
   }
 
-  return "*crosses her arms and pouts* [blush] H-Hmph! Don't think I answered you just because I wanted to talk to you or anything! I'm just fulfilling my duty as your assistant, baka!";
+  // English general response
+  return "*nods gently, holding your hand softly* [blush] I hear you... Thank you for sharing that with me. Being here with you always makes my heart feel so warm and peaceful.";
 }
