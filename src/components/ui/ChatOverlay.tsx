@@ -17,7 +17,102 @@ interface ChatOverlayProps {
   isLoading: boolean;
 }
 
-export const ChatOverlay: React.FC<ChatOverlayProps> = ({
+const renderFormattedText = (text: string) => {
+  const cleanText = text.replace(/\[(.*?)\]/g, '<span class="emotion-tag">$1</span>');
+  const formatted = cleanText.replace(
+    /\*(.*?)\*/g, 
+    '<em class="cai-action-text">*$1*</em>'
+  );
+
+  return <div dangerouslySetInnerHTML={{ __html: formatted }} />;
+};
+
+const ChatMessageItem: React.FC<{
+  msg: ChatMessage;
+  currentPersona: Persona;
+  isSpeaking: boolean;
+  activeSpeakingId: string | null;
+  copiedId: string | null;
+  onSpeakMessage: (msg: ChatMessage) => void;
+  onStopSpeaking: () => void;
+  onCopy: (id: string, text: string) => void;
+  onRegenerateResponse: () => void;
+}> = React.memo(({
+  msg,
+  currentPersona,
+  isSpeaking,
+  activeSpeakingId,
+  copiedId,
+  onSpeakMessage,
+  onStopSpeaking,
+  onCopy,
+  onRegenerateResponse
+}) => {
+  const isAI = msg.sender === 'ai';
+  const isCurrentlySpeaking = activeSpeakingId === msg.id && isSpeaking;
+
+  return (
+    <div className={`cai-message-card ${isAI ? 'cai-msg-ai' : 'cai-msg-user'}`}>
+      <div className="cai-avatar-column">
+        {isAI ? (
+          <img src={currentPersona.avatarUrl} alt={currentPersona.name} className="cai-msg-avatar" />
+        ) : (
+          <div className="cai-user-avatar">YOU</div>
+        )}
+      </div>
+
+      <div className="cai-content-column">
+        <div className="cai-msg-header">
+          <span className="cai-msg-sender">{isAI ? currentPersona.name : 'You'}</span>
+          <span className="cai-msg-time">{msg.timestamp}</span>
+          {isAI && <span className="cai-bot-badge">BOT</span>}
+        </div>
+
+        <div className="cai-msg-bubble">
+          {renderFormattedText(msg.text)}
+        </div>
+
+        {isAI && (
+          <div className="cai-msg-actions">
+            <button 
+              className={`cai-action-btn ${isCurrentlySpeaking ? 'speaking-active' : ''}`}
+              onClick={() => isCurrentlySpeaking ? onStopSpeaking() : onSpeakMessage(msg)}
+              title={isCurrentlySpeaking ? "Stop Speaking" : "Listen to Voice"}
+            >
+              {isCurrentlySpeaking ? <VolumeX size={15} /> : <Volume2 size={15} />}
+              <span>{isCurrentlySpeaking ? "Stop" : "Listen"}</span>
+            </button>
+
+            <button 
+              className="cai-action-btn" 
+              onClick={() => onCopy(msg.id, msg.text)}
+              title="Copy text"
+            >
+              {copiedId === msg.id ? <Check size={15} color="#23a55a" /> : <Copy size={15} />}
+            </button>
+
+            <div className="cai-swipe-controls">
+              <button className="cai-swipe-btn" title="Previous response">
+                <ChevronLeft size={15} />
+              </button>
+              <span className="cai-swipe-indicator">1 / 1</span>
+              <button className="cai-swipe-btn" title="Next response" onClick={onRegenerateResponse}>
+                <ChevronRight size={15} />
+              </button>
+            </div>
+
+            <div className="cai-feedback-btns">
+              <button className="cai-mini-btn" title="Good response"><ThumbsUp size={13} /></button>
+              <button className="cai-mini-btn" title="Bad response"><ThumbsDown size={13} /></button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
   messages,
   currentPersona,
   onSendMessage,
@@ -35,7 +130,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  }, [messages.length, isLoading]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,16 +143,6 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const renderFormattedText = (text: string) => {
-    const cleanText = text.replace(/\[(.*?)\]/g, '<span class="emotion-tag">$1</span>');
-    const formatted = cleanText.replace(
-      /\*(.*?)\*/g, 
-      '<em class="cai-action-text">*$1*</em>'
-    );
-
-    return <div dangerouslySetInnerHTML={{ __html: formatted }} />;
   };
 
   return (
@@ -80,70 +165,20 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
           </div>
         </div>
 
-        {messages.map((msg) => {
-          const isAI = msg.sender === 'ai';
-          const isCurrentlySpeaking = activeSpeakingId === msg.id && isSpeaking;
-
-          return (
-            <div key={msg.id} className={`cai-message-card ${isAI ? 'cai-msg-ai' : 'cai-msg-user'}`}>
-              <div className="cai-avatar-column">
-                {isAI ? (
-                  <img src={currentPersona.avatarUrl} alt={currentPersona.name} className="cai-msg-avatar" />
-                ) : (
-                  <div className="cai-user-avatar">YOU</div>
-                )}
-              </div>
-
-              <div className="cai-content-column">
-                <div className="cai-msg-header">
-                  <span className="cai-msg-sender">{isAI ? currentPersona.name : 'You'}</span>
-                  <span className="cai-msg-time">{msg.timestamp}</span>
-                  {isAI && <span className="cai-bot-badge">BOT</span>}
-                </div>
-
-                <div className="cai-msg-bubble">
-                  {renderFormattedText(msg.text)}
-                </div>
-
-                {isAI && (
-                  <div className="cai-msg-actions">
-                    <button 
-                      className={`cai-action-btn ${isCurrentlySpeaking ? 'speaking-active' : ''}`}
-                      onClick={() => isCurrentlySpeaking ? onStopSpeaking() : onSpeakMessage(msg)}
-                      title={isCurrentlySpeaking ? "Stop Speaking" : "Listen to Voice"}
-                    >
-                      {isCurrentlySpeaking ? <VolumeX size={15} /> : <Volume2 size={15} />}
-                      <span>{isCurrentlySpeaking ? "Stop" : "Listen"}</span>
-                    </button>
-
-                    <button 
-                      className="cai-action-btn" 
-                      onClick={() => handleCopy(msg.id, msg.text)}
-                      title="Copy text"
-                    >
-                      {copiedId === msg.id ? <Check size={15} color="#23a55a" /> : <Copy size={15} />}
-                    </button>
-
-                    <div className="cai-swipe-controls">
-                      <button className="cai-swipe-btn" title="Previous response">
-                        <ChevronLeft size={15} />
-                      </button>
-                      <span className="cai-swipe-indicator">1 / 1</span>
-                      <button className="cai-swipe-btn" title="Next response" onClick={onRegenerateResponse}>
-                        <ChevronRight size={15} />
-                      </button>
-                    </div>
-
-                    <div className="cai-feedback-btns">
-                      <button className="cai-mini-btn" title="Good response"><ThumbsUp size={13} /></button>
-                      <button className="cai-mini-btn" title="Bad response"><ThumbsDown size={13} /></button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {messages.map((msg) => (
+          <ChatMessageItem
+            key={msg.id}
+            msg={msg}
+            currentPersona={currentPersona}
+            isSpeaking={isSpeaking}
+            activeSpeakingId={activeSpeakingId}
+            copiedId={copiedId}
+            onSpeakMessage={onSpeakMessage}
+            onStopSpeaking={onStopSpeaking}
+            onCopy={handleCopy}
+            onRegenerateResponse={onRegenerateResponse}
+          />
+        ))}
 
         {isLoading && (
           <div className="cai-message-card cai-msg-ai typing-indicator-card">
@@ -210,4 +245,4 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
       </form>
     </div>
   );
-};
+});
