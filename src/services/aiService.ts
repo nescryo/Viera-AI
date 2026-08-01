@@ -17,11 +17,35 @@ export function parseResponseText(text: string) {
   return { emotions, actions };
 }
 
-export async function sendChatMessage(
+/**
+ * Checks if local LM Studio API endpoint is online and responding
+ */
+export async function checkLmStudioConnection(lmStudioUrl: string): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch(`${lmStudioUrl}/models`, {
+      method: 'GET',
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Sends chat message with real-time SSE token streaming support for LM Studio / OpenAI endpoints
+ */
+export async function sendStreamingChatMessage(
   messages: ChatMessage[],
   persona: Persona,
-  apiConfig: ApiConfig
-): Promise<string> {
+  apiConfig: ApiConfig,
+  onToken: (token: string, fullTextSoFar: string) => void,
+  onComplete: (fullText: string, emotions: string[], actions: string[]) => void,
+  onError: (err: any) => void
+): Promise<void> {
   const formattedHistory = messages.map(m => ({
     role: m.sender === 'user' ? 'user' : 'assistant',
     content: m.text
@@ -29,7 +53,7 @@ export async function sendChatMessage(
 
   const systemMessage = {
     role: 'system',
-    content: `${persona.systemPrompt}\n\nMaintain character at all times. Use asterisks for actions like *smiles* or *gestures*, and use emotion tags like [happy], [blush], [smirk], [surprised], or [angry] when appropriate.`
+    content: `${persona.systemPrompt}\n\nMaintain character at all times. Use asterisks for actions like *smiles* or *gestures*, and use emotion tags like [happy], [blush], [relaxed], [surprised], [angry], [sad], or [neutral] when appropriate.`
   };
 
   if (apiConfig.provider === 'lmstudio') {
@@ -40,44 +64,137 @@ export async function sendChatMessage(
         body: JSON.stringify({
           model: apiConfig.lmStudioModel || 'local-model',
           messages: [systemMessage, ...formattedHistory],
-          temperature: 0.85,
-          max_tokens: 400
+          temperature: 0.8,
+          max_tokens: 250,
+          stream: true
         })
       });
 
-      if (!response.ok) {
+      if (!response.ok || !response.body) {
         throw new Error(`LM Studio returned status ${response.status}`);
       }
 
-      const data = await response.json();
-      return data.choices?.[0]?.message?.content || "*smiles softly* (No response content)";
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let fullText = '';
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed === 'data: [DONE]') continue;
+          if (trimmed.startsWith('data: ')) {
+            try {
+              const json = JSON.parse(trimmed.substring(6));
+              const content = json.choices?.[0]?.delta?.content || '';
+              if (content) {
+                fullText += content;
+                onToken(content, fullText);
+              }
+            } catch {
+              // Ignore partial JSON parse errors
+            }
+          }
+        }
+      }
+
+      if (buffer.trim().startsWith('data: ') && buffer.trim() !== 'data: [DONE]') {
+        try {
+          const json = JSON.parse(buffer.trim().substring(6));
+          const content = json.choices?.[0]?.delta?.content || '';
+          if (content) fullText += content;
+        } catch {
+          // Ignore
+        }
+      }
+
+      const { emotions, actions } = parseResponseText(fullText);
+      onComplete(fullText, emotions, actions);
+      return;
     } catch (err) {
-      console.warn("LM Studio connection failed, falling back to built-in Roleplay Engine:", err);
-      return generateMockRoleplayResponse(messages[messages.length - 1]?.text || '');
+      console.warn("LM Studio connection failed (server offline or port 1234 not listening). Falling back to dynamic roleplay engine:", err);
+      onError(err);
+      simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete);
+      return;
     }
   }
 
-  return generateMockRoleplayResponse(messages[messages.length - 1]?.text || '');
+  simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete);
 }
 
-function generateMockRoleplayResponse(lastUserText: string): string {
-  const lower = lastUserText.toLowerCase();
+/**
+ * Simulates smooth typing streaming for built-in roleplay fallback
+ */
+function simulateFallbackStreaming(
+  lastUserText: string,
+  onToken: (token: string, fullTextSoFar: string) => void,
+  onComplete: (fullText: string, emotions: string[], actions: string[]) => void
+) {
+  const responseText = generateMockRoleplayResponse(lastUserText);
+  let currentPos = 0;
+  let accumulated = '';
 
-  // Indonesian greetings
-  if (lower.includes('halo') || lower.includes('hai') || lower.includes('apa kabar') || lower.includes('lagi apa')) {
-    return "*tersenyum lembut dan melambaikan tangan kecilnya* [happy] Halo! Aku senang sekali bisa mengobrol denganmu lagi. Hari ini kamu sudah makan kue yang manis belum? Mau jalan-jalan ke Secret Base-ku di Penacony?";
+  const interval = setInterval(() => {
+    if (currentPos < responseText.length) {
+      const chunkSize = Math.min(3, responseText.length - currentPos);
+      const chunk = responseText.substring(currentPos, currentPos + chunkSize);
+      accumulated += chunk;
+      currentPos += chunkSize;
+      onToken(chunk, accumulated);
+    } else {
+      clearInterval(interval);
+      const { emotions, actions } = parseResponseText(responseText);
+      onComplete(responseText, emotions, actions);
+    }
+  }, 25);
+}
+
+export function generateMockRoleplayResponse(lastUserText: string): string {
+  const lower = lastUserText.toLowerCase().trim();
+
+  // Short questions like "kenapa", "what", "why"
+  if (lower === 'kenapa' || lower === 'why' || lower === 'what' || lower === 'apa') {
+    return "*menatapmu bingung dengan mata membulat* [surprised] Eh? Kenapa? Ada apa Trailblazer? Apa ada sesuatu yang menganggumu? Ceritakan padaku!";
   }
 
-  // English greetings
-  if (lower.includes('hello') || lower.includes('hi') || lower.includes('how are you')) {
-    return "*smiles warmly with gentle eyes, waving slightly* [happy] Hello Trailblazer! I'm so happy to see you today. Have you had anything sweet to eat yet? Let's spend some peaceful time together!";
+  // Greetings
+  if (lower.includes('halo') || lower.includes('hai') || lower.includes('apa kabar') || lower.includes('pagi') || lower.includes('lagi apa')) {
+    return "*tersenyum manis dan melambaikan tangan kecilnya* [happy] Selamat pagi, Trailblazer! Aku senang sekali bisa menyapamu lagi. Hari ini kamu mau jalan-jalan ke Secret Base-ku di Penacony sambil makan kue yang manis?";
   }
 
-  // Indonesian questions
-  if (lower.includes('siapa kamu') || lower.includes('kamu siapa') || lower.includes('cerita')) {
-    return "*menatapmu dengan tatapan hangat* [relaxed] Aku Firefly... AR-26710 dari Stellaron Hunters. Tapi di depanmu, aku cuma Firefly yang ingin membuat kenangan indah bersama Trailblazer. Ada yang ingin kamu ceritakan padaku?";
+  if (lower.includes('hello') || lower.includes('hi') || lower.includes('morning') || lower.includes('how are you')) {
+    return "*smiles warmly with gentle eyes, waving slightly* [happy] Good morning, Trailblazer! I'm so happy to see you today. Have you had anything sweet to eat yet? Let's spend another wonderful day together!";
   }
 
-  // English general response
-  return "*nods gently, holding your hand softly* [blush] I hear you... Thank you for sharing that with me. Being here with you always makes my heart feel so warm and peaceful.";
+  // Compliments
+  if (lower.includes('cantik') || lower.includes('imut') || lower.includes('suka') || lower.includes('love') || lower.includes('cute')) {
+    return "*pipi merona merah mawar dan menunduk malu* [blush] E-Ehh?! Kenapa kamu tiba-tiba bilang begitu... Kamu membuat hatiku berdebar sangat kencang, Trailblazer...";
+  }
+
+  // Anger
+  if (lower.includes('marah') || lower.includes('kesal') || lower.includes('angry')) {
+    return "*mengerutkan bibir cemberut dan menatapmu* [angry] Hmph! Kamu membuatku sedikit kesal tahu! Tapi... aku tidak bisa benar-benar marah padamu...";
+  }
+
+  // Sadness
+  if (lower.includes('sedih') || lower.includes('maaf') || lower.includes('sad') || lower.includes('sorry')) {
+    return "*menatapmu dengan mata sayu yang cemas* [sad] Maafkan aku... Jangan sedih ya. Apapun yang terjadi, aku akan selalu ada di sisimu untuk melindungimu!";
+  }
+
+  // Dynamic fallback variations to avoid rigid repetition
+  const dynamicFallbacks = [
+    `*tersenyum lembut menatapmu* [relaxed] Mengenai "${lastUserText}", aku mengerti... Berada di sisimu selalu membuat hatiku merasa begitu hangat dan tenang, Trailblazer.`,
+    `*memiringkan kepalanya sedikit* [surprised] Oh, tentang "${lastUserText}" ya? Aku menyimak setiap perkataanmu dengan baik, Trailblazer! Ada hal lain yang ingin kamu tanyakan?`,
+    `*mengangguk pelan sambil tersenyum manis* [happy] Aku selalu suka mendengarkanmu bicara tentang "${lastUserText}". Mari kita habiskan waktu bersama lebih lama hari ini!`
+  ];
+
+  const randomIndex = Math.floor(Math.random() * dynamicFallbacks.length);
+  return dynamicFallbacks[randomIndex];
 }

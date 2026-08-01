@@ -242,6 +242,28 @@
   background: var(--accent-blurple);
 }
 
+.provider-pill.online {
+  border-color: rgba(82, 196, 26, 0.4);
+  background: rgba(82, 196, 26, 0.08);
+  color: #a0d911;
+}
+
+.provider-pill.offline {
+  border-color: rgba(250, 173, 20, 0.4);
+  background: rgba(250, 173, 20, 0.08);
+  color: #ffc53d;
+}
+
+.dot-online {
+  background-color: #52c41a !important;
+  box-shadow: 0 0 8px #52c41a;
+}
+
+.dot-offline {
+  background-color: #faad14 !important;
+  box-shadow: 0 0 8px #faad14;
+}
+
 /* Character.AI Style Floating Chat Overlay */
 .chat-overlay-container {
   position: absolute;

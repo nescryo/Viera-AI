@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { Persona, ApiConfig } from '../../types';
 import { Settings, Sparkles, Upload, Circle } from 'lucide-react';
+import { checkLmStudioConnection } from '../../services/aiService';
 
 interface HeaderProps {
   currentPersona: Persona;
@@ -15,6 +16,25 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenModelUploader,
   apiConfig
 }) => {
+  const [isLmStudioOnline, setIsLmStudioOnline] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkConnection = async () => {
+      if (apiConfig.provider === 'lmstudio') {
+        const online = await checkLmStudioConnection(apiConfig.lmStudioUrl);
+        if (isMounted) setIsLmStudioOnline(online);
+      }
+    };
+
+    checkConnection();
+    const interval = setInterval(checkConnection, 5000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [apiConfig]);
+
   return (
     <header className="header-container glass-panel">
       {/* Left: App Brand & Active 3D Character Status */}
@@ -41,10 +61,14 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: 3D Model Loader & Settings */}
       <div className="header-right">
-        <div className={`provider-pill provider-${apiConfig.provider}`}>
-          <span className="provider-dot" />
+        <div className={`provider-pill ${isLmStudioOnline ? 'online' : 'offline'}`}>
+          <span className={`provider-dot ${isLmStudioOnline ? 'dot-online' : 'dot-offline'}`} />
           <span className="provider-name">
-            {apiConfig.provider === 'lmstudio' ? 'LM Studio (Local)' : 'Mock Engine'}
+            {apiConfig.provider === 'lmstudio'
+              ? isLmStudioOnline
+                ? 'LM Studio (Connected :1234)'
+                : 'LM Studio (Offline • Mock Mode)'
+              : 'Mock Engine'}
           </span>
         </div>
 

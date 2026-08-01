@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ChatMessage, Persona, ApiConfig } from './types';
 import { FIREFLY_PERSONA } from './data/personas';
-import { sendChatMessage, parseResponseText } from './services/aiService';
+import { sendStreamingChatMessage, parseResponseText } from './services/aiService';
 import { ttsService } from './services/ttsService';
 
 import { Header } from './components/ui/Header';
@@ -48,30 +48,67 @@ export function App() {
     setMessages(updatedMessages);
     setIsLoading(true);
 
-    try {
-      const aiResponseText = await sendChatMessage(updatedMessages, currentPersona, apiConfig);
-      
-      const { emotions, actions } = parseResponseText(aiResponseText);
-      const activeEmotion = emotions[0] || 'happy';
-      setCurrentEmotion(activeEmotion);
+    const aiMsgId = (Date.now() + 1).toString();
+    const placeholderAiMsg: ChatMessage = {
+      id: aiMsgId,
+      sender: 'ai',
+      characterId: currentPersona.id,
+      text: '',
+      emotions: [],
+      actions: [],
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
 
-      const aiMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        sender: 'ai',
-        characterId: currentPersona.id,
-        text: aiResponseText,
-        emotions,
-        actions,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
+    setMessages((prev) => [...prev, placeholderAiMsg]);
 
-      setMessages((prev) => [...prev, aiMsg]);
-      speakMessage(aiMsg);
-    } catch (err) {
-      console.error("AI Generation error:", err);
-    } finally {
-      setIsLoading(false);
-    }
+    sendStreamingChatMessage(
+      updatedMessages,
+      currentPersona,
+      apiConfig,
+      (_token, fullTextSoFar) => {
+        setIsLoading(false);
+        const { emotions, actions } = parseResponseText(fullTextSoFar);
+        
+        // Auto-trigger 3D facial blendshapes in real-time as emotion tags arrive!
+        if (emotions.length > 0) {
+          const activeEmotion = emotions[emotions.length - 1];
+          setCurrentEmotion(activeEmotion);
+        }
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === aiMsgId
+              ? { ...msg, text: fullTextSoFar, emotions, actions }
+              : msg
+          )
+        );
+      },
+      (fullText, emotions, actions) => {
+        setIsLoading(false);
+        const activeEmotion = emotions[0] || 'happy';
+        setCurrentEmotion(activeEmotion);
+
+        const finalMsg: ChatMessage = {
+          id: aiMsgId,
+          sender: 'ai',
+          characterId: currentPersona.id,
+          text: fullText,
+          emotions,
+          actions,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        setMessages((prev) =>
+          prev.map((msg) => (msg.id === aiMsgId ? finalMsg : msg))
+        );
+
+        speakMessage(finalMsg);
+      },
+      (err) => {
+        console.error("Streaming error:", err);
+        setIsLoading(false);
+      }
+    );
   };
 
   const speakMessage = (msg: ChatMessage) => {
