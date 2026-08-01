@@ -66,7 +66,6 @@ export function App() {
       currentPersona,
       apiConfig,
       (_token, fullTextSoFar) => {
-        setIsLoading(false);
         const { emotions, actions } = parseResponseText(fullTextSoFar);
         
         // Auto-trigger 3D facial blendshapes in real-time as emotion tags arrive!

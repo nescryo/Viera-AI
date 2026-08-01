@@ -175,24 +175,24 @@ export function generateMockRoleplayResponse(lastUserText: string): string {
 
   // Compliments
   if (lower.includes('cantik') || lower.includes('imut') || lower.includes('suka') || lower.includes('love') || lower.includes('cute')) {
-    return "*pipi merona merah mawar dan menunduk malu* [blush] E-Ehh?! Kenapa kamu tiba-tiba bilang begitu... Kamu membuat hatiku berdebar sangat kencang, Trailblazer...";
+    return "*cheeks blush soft rose and looks down timidly* [blush] E-Ehh?! Why are you saying that so suddenly... You make my heart flutter so fast, Trailblazer...";
   }
 
   // Anger
   if (lower.includes('marah') || lower.includes('kesal') || lower.includes('angry')) {
-    return "*mengerutkan bibir cemberut dan menatapmu* [angry] Hmph! Kamu membuatku sedikit kesal tahu! Tapi... aku tidak bisa benar-benar marah padamu...";
+    return "*pouts her lips slightly and glares* [angry] Hmph! You're making me a little upset, you know! But... I can never stay truly angry at you...";
   }
 
   // Sadness
   if (lower.includes('sedih') || lower.includes('maaf') || lower.includes('sad') || lower.includes('sorry')) {
-    return "*menatapmu dengan mata sayu yang cemas* [sad] Maafkan aku... Jangan sedih ya. Apapun yang terjadi, aku akan selalu ada di sisimu untuk melindungimu!";
+    return "*looks at you with gentle, worried eyes* [sad] Please don't be sad... Whatever happens, I will always stay by your side to protect you!";
   }
 
   // Dynamic fallback variations to avoid rigid repetition
   const dynamicFallbacks = [
-    `*tersenyum lembut menatapmu* [relaxed] Mengenai "${lastUserText}", aku mengerti... Berada di sisimu selalu membuat hatiku merasa begitu hangat dan tenang, Trailblazer.`,
-    `*memiringkan kepalanya sedikit* [surprised] Oh, tentang "${lastUserText}" ya? Aku menyimak setiap perkataanmu dengan baik, Trailblazer! Ada hal lain yang ingin kamu tanyakan?`,
-    `*mengangguk pelan sambil tersenyum manis* [happy] Aku selalu suka mendengarkanmu bicara tentang "${lastUserText}". Mari kita habiskan waktu bersama lebih lama hari ini!`
+    `*smiles softly looking at you* [relaxed] Regarding "${lastUserText}", I understand... Being by your side always makes my heart feel so warm and peaceful, Trailblazer.`,
+    `*tilts her head slightly* [surprised] Oh, about "${lastUserText}"? I'm listening to everything you say carefully, Trailblazer! Is there anything else on your mind?`,
+    `*nods gently with a sweet smile* [happy] I always love hearing you talk about "${lastUserText}". Let's spend more quality time together today!`
   ];
 
   const randomIndex = Math.floor(Math.random() * dynamicFallbacks.length);
