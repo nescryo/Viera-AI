@@ -68,7 +68,7 @@ function createSoftPorcelainCheekTexture(): THREE.CanvasTexture {
   return texture;
 }
 
-export const Scene: React.FC<SceneProps> = ({
+export const Scene: React.FC<SceneProps> = React.memo(({
   currentPersona,
   currentEmotion,
   onSelectEmotion
@@ -123,6 +123,12 @@ export const Scene: React.FC<SceneProps> = ({
 
     containerRef.current.innerHTML = '';
     containerRef.current.appendChild(renderer.domElement);
+
+    const handleContextLost = (e: Event) => {
+      e.preventDefault();
+      cancelAnimationFrame(animationFrameId);
+    };
+    renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
 
     // 2. Bright & Cheerful Anime Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
@@ -559,6 +565,8 @@ export const Scene: React.FC<SceneProps> = ({
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('resize', handleResize);
+      renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
+      softPorcelainCheekTex.dispose();
       renderer.dispose();
     };
   }, [currentPersona]);
@@ -592,4 +600,4 @@ export const Scene: React.FC<SceneProps> = ({
       </div>
     </div>
   );
-};
+});
