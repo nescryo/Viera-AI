@@ -1,0 +1,23 @@
+name: "Gemini Code Review (Manual Trigger)"
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  review:
+    # Only proceed if the comment was made in a Pull Request AND contains the word '/gemini-review'
+    if: github.event.issue.pull_request && contains(github.event.comment.body, '/gemini-review')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Gemini PR Reviewer
+        uses: derailed-dash/gemini-review-action@v1
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
