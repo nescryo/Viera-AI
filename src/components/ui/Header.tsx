@@ -24,6 +24,8 @@ export const Header: React.FC<HeaderProps> = ({
       if (apiConfig.provider === 'lmstudio') {
         const online = await checkLmStudioConnection(apiConfig.lmStudioUrl);
         if (isMounted) setIsLmStudioOnline(online);
+      } else {
+        if (isMounted) setIsLmStudioOnline(false);
       }
     };
 
