@@ -94,6 +94,10 @@ export function App() {
         }
       },
       (fullText, emotions, actions) => {
+        if (updateFrameId) {
+          cancelAnimationFrame(updateFrameId);
+          updateFrameId = null;
+        }
         setIsLoading(false);
         const activeEmotion = emotions[0] || 'happy';
         setCurrentEmotion(activeEmotion);
@@ -115,6 +119,10 @@ export function App() {
         speakMessage(finalMsg);
       },
       (err) => {
+        if (updateFrameId) {
+          cancelAnimationFrame(updateFrameId);
+          updateFrameId = null;
+        }
         console.error("Streaming error:", err);
         setIsLoading(false);
       }

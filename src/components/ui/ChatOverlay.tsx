@@ -17,8 +17,18 @@ interface ChatOverlayProps {
   isLoading: boolean;
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 const renderFormattedText = (text: string) => {
-  const cleanText = text.replace(/\[(.*?)\]/g, '<span class="emotion-tag">$1</span>');
+  const safeText = escapeHtml(text);
+  const cleanText = safeText.replace(/\[(.*?)\]/g, '<span class="emotion-tag">$1</span>');
   const formatted = cleanText.replace(
     /\*(.*?)\*/g, 
     '<em class="cai-action-text">*$1*</em>'
@@ -128,9 +138,11 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
   const [isRecording, setIsRecording] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const latestMessageText = messages[messages.length - 1]?.text || '';
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, isLoading]);
+  }, [messages.length, isLoading, latestMessageText]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
