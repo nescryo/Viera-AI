@@ -67,6 +67,7 @@ function createSoftPorcelainCheekTexture(): THREE.CanvasTexture {
 
 export const Scene: React.FC<SceneProps> = React.memo(({
   currentPersona,
+  isSpeaking,
   currentEmotion,
   onSelectEmotion
 }) => {
@@ -80,6 +81,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
   useEffect(() => {
     currentEmotionRef.current = currentEmotion;
   }, [currentEmotion]);
+
+  const isSpeakingRef = useRef(isSpeaking);
+  useEffect(() => {
+    isSpeakingRef.current = isSpeaking;
+  }, [isSpeaking]);
 
   // Ref to hold loaded MMD mesh, bones, cheek blush materials, and morph target dictionary
   const mmdMeshRef = useRef<THREE.SkinnedMesh | null>(null);
@@ -528,6 +534,13 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           targetSadEye = 0.45;
           targetFrownMouth = 0.75;
           targetSmallMouth = 0.35;
+        }
+
+        // Real-Time 3D Lip-Sync Mouth Flap Animation when Firefly speaks
+        if (isSpeakingRef.current) {
+          const mouthFlapPhase = Math.abs(Math.sin(elapsedTime * 14.0));
+          targetOpenMouth = Math.max(targetOpenMouth, mouthFlapPhase * 0.55);
+          targetSmileMouth = Math.max(targetSmileMouth, (1 - mouthFlapPhase) * 0.35);
         }
 
         // Smoothly fade soft rose-peach cheekbone blush
