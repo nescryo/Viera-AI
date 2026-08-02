@@ -544,18 +544,18 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           targetSmallMouth = 0.35;
         }
 
-        // Gentle, Sweet Anime Lip-Sync Mouth Flap Animation (0.15 to 0.38 max)
+        // Clearly Visible & Rhythmic Anime Lip-Sync Mouth Flap (0.00 Closed -> 0.52 Open)
         if (isSpeakingRef.current) {
-          // Keep Firefly's sweet smile active while speaking
-          targetSmileMouth = Math.max(targetSmileMouth, 0.40);
+          // Maintain cute smile base
+          targetSmileMouth = 0.35;
 
-          // Gentle anime mouth flap opening (between 0.15 and 0.38 max)
+          // Fluctuate cleanly between 0.00 (fully closed) and 0.52 (open) so mouth opening/closing is 100% visible
           const rawWave = Math.sin(elapsedTime * 14.0);
-          const openPower = Math.abs(rawWave);
+          const mouthOpenWave = Math.pow(Math.abs(rawWave), 1.2);
 
-          targetVowelA = 0.15 + openPower * 0.23; // 0.15 to 0.38 max (sweet anime mouth movement)
-          targetVowelI = Math.abs(Math.cos(elapsedTime * 10.0)) * 0.18;
-          targetVowelE = Math.abs(Math.sin(elapsedTime * 12.0)) * 0.12;
+          targetVowelA = mouthOpenWave * 0.52; // 0.00 -> 0.52 -> 0.00 (clearly visible rhythm!)
+          targetVowelI = Math.abs(Math.cos(elapsedTime * 10.0)) * 0.15;
+          targetVowelE = Math.abs(Math.sin(elapsedTime * 12.0)) * 0.10;
         }
 
         // Smoothly fade soft rose-peach cheekbone blush
