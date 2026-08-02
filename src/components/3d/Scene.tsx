@@ -67,6 +67,7 @@ function createSoftPorcelainCheekTexture(): THREE.CanvasTexture {
 
 export const Scene: React.FC<SceneProps> = React.memo(({
   currentPersona,
+  isSpeaking,
   currentEmotion,
   onSelectEmotion
 }) => {
@@ -80,6 +81,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
   useEffect(() => {
     currentEmotionRef.current = currentEmotion;
   }, [currentEmotion]);
+
+  const isSpeakingRef = useRef(isSpeaking);
+  useEffect(() => {
+    isSpeakingRef.current = isSpeaking;
+  }, [isSpeaking]);
 
   // Ref to hold loaded MMD mesh, bones, cheek blush materials, and morph target dictionary
   const mmdMeshRef = useRef<THREE.SkinnedMesh | null>(null);
@@ -469,12 +475,16 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           }
         }
 
-        // Morph Target Lookups
-        const morphSmileMouth  = getMorphIdx('口角上げ') ?? getMorphIdx('あ');
-        const morphOpenMouth   = getMorphIdx('あ') ?? getMorphIdx('い');
-        const morphSmallMouth  = getMorphIdx('ん') ?? getMorphIdx('へ');
-        const morphFrownMouth  = getMorphIdx('口角下げ') ?? getMorphIdx('▲') ?? getMorphIdx('△');
-        const morphSurprisedMouth = getMorphIdx('お') ?? getMorphIdx('ワ');
+        // MMD Vowel Morph Target Lookups
+        const morphVowelA  = getMorphIdx('あ');
+        const morphVowelI  = getMorphIdx('い');
+        const morphVowelU  = getMorphIdx('う');
+        const morphVowelE  = getMorphIdx('え');
+        const morphVowelO  = getMorphIdx('お');
+
+        const morphSmileMouth = getMorphIdx('口角上げ');
+        const morphSmallMouth = getMorphIdx('ん') ?? getMorphIdx('へ');
+        const morphFrownMouth = getMorphIdx('口角下げ') ?? getMorphIdx('▲') ?? getMorphIdx('△');
 
         const morphRelaxedEye  = getMorphIdx('じと目') ?? getMorphIdx('笑い');
         const morphRelaxedEyebrow = getMorphIdx('にこり') ?? getMorphIdx('下');
@@ -489,10 +499,14 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         const morphSurprisedEyebrow = getMorphIdx('上');
 
         let targetSmileMouth = 0;
-        let targetOpenMouth = 0;
         let targetSmallMouth = 0;
         let targetFrownMouth = 0;
-        let targetSurprisedMouth = 0;
+
+        let targetVowelA = 0;
+        let targetVowelI = 0;
+        let targetVowelU = 0;
+        let targetVowelE = 0;
+        let targetVowelO = 0;
 
         let targetRelaxedEye = 0;
         let targetRelaxedEyebrow = 0;
@@ -505,7 +519,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 
         if (emo === 'happy') {
           targetSmileMouth = 0.55;
-          targetOpenMouth = 0.35;
+          targetVowelA = 0.32; // Firefly signature cute open-mouth smile :D
           targetRelaxedEyebrow = 0.25;
         } else if (emo === 'blush') {
           targetSmallMouth = 0.45;
@@ -517,7 +531,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         } else if (emo === 'surprised') {
           targetSurprisedEye = 0.85;
           targetSurprisedEyebrow = 0.75;
-          targetSurprisedMouth = 0.65;
+          targetVowelO = 0.55;
         } else if (emo === 'angry') {
           targetAngryEyebrow = 0.95;
           targetAngryEye = 0.55;
@@ -528,6 +542,50 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           targetSadEye = 0.45;
           targetFrownMouth = 0.75;
           targetSmallMouth = 0.35;
+        }
+
+        // Organic Emotion-Contextual Anime Speech Wave Generator (Sad, Angry, Blush, Happy)
+        if (isSpeakingRef.current) {
+          const t = elapsedTime;
+          // Multi-frequency irregular harmonics
+          const speechWave1 = Math.sin(t * 13.5);
+          const speechWave2 = Math.sin(t * 23.7) * 0.4;
+          const speechWave3 = Math.cos(t * 8.3) * 0.3;
+          const noisePause = Math.sin(t * 3.1);
+
+          // Syllable micro-pauses (brief rest when speaker pauses between words)
+          const organicFactor = noisePause < -0.3 ? 0.08 : 1.0;
+
+          const combinedWave = Math.max(0, (speechWave1 + speechWave2 + speechWave3) * 0.55);
+          const openPower = Math.pow(combinedWave, 1.1) * organicFactor;
+
+          if (emo === 'sad') {
+            // Melancholy speech: NO smile, keep gentle sad downturned mouth corners (0.22)
+            targetSmileMouth = 0;
+            targetFrownMouth = 0.22;
+            targetSmallMouth = 0;
+            targetVowelA = Math.min(0.35, openPower * 0.40);
+            targetVowelI = Math.abs(Math.sin(t * 9.0)) * 0.15 * organicFactor;
+            targetVowelO = Math.abs(Math.sin(t * 6.0)) * 0.20 * organicFactor;
+          } else if (emo === 'angry') {
+            // Determined/Angry speech: NO smile, keep firm mouth tension
+            targetSmileMouth = 0;
+            targetFrownMouth = 0.28;
+            targetSmallMouth = 0;
+            targetVowelA = Math.min(0.42, openPower * 0.48);
+          } else if (emo === 'blush') {
+            // Shy speech: keep subtle blushing small mouth
+            targetSmileMouth = 0.20;
+            targetSmallMouth = 0.25 * (1 - openPower);
+            targetVowelA = Math.min(0.35, openPower * 0.38);
+          } else {
+            // Happy / Relaxed / Neutral speech: sweet anime smile base
+            targetSmileMouth = 0.35;
+            targetVowelA = Math.min(0.52, openPower * 0.55);
+            targetVowelI = Math.abs(Math.sin(t * 11.2)) * 0.22 * organicFactor;
+            targetVowelE = Math.abs(Math.cos(t * 17.4)) * 0.18 * organicFactor;
+            targetVowelO = Math.abs(Math.sin(t * 6.8)) * 0.25 * organicFactor;
+          }
         }
 
         // Smoothly fade soft rose-peach cheekbone blush
@@ -544,11 +602,15 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           targetMap.set(idx, Math.max(curr, val));
         };
 
+        setMorphTarget(morphVowelA, targetVowelA);
+        setMorphTarget(morphVowelI, targetVowelI);
+        setMorphTarget(morphVowelU, targetVowelU);
+        setMorphTarget(morphVowelE, targetVowelE);
+        setMorphTarget(morphVowelO, targetVowelO);
+
         setMorphTarget(morphSmileMouth, targetSmileMouth);
-        setMorphTarget(morphOpenMouth, targetOpenMouth);
         setMorphTarget(morphSmallMouth, targetSmallMouth);
         setMorphTarget(morphFrownMouth, targetFrownMouth);
-        setMorphTarget(morphSurprisedMouth, targetSurprisedMouth);
 
         setMorphTarget(morphRelaxedEye, targetRelaxedEye);
         setMorphTarget(morphRelaxedEyebrow, targetRelaxedEyebrow);
