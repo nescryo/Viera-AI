@@ -61,12 +61,16 @@ export function App() {
 
     setMessages((prev) => [...prev, placeholderAiMsg]);
 
+    let updateFrameId: number | null = null;
+    let latestText = '';
+
     sendStreamingChatMessage(
       updatedMessages,
       currentPersona,
       apiConfig,
       (_token, fullTextSoFar) => {
-        const { emotions, actions } = parseResponseText(fullTextSoFar);
+        latestText = fullTextSoFar;
+        const { emotions } = parseResponseText(fullTextSoFar);
         
         // Auto-trigger 3D facial blendshapes in real-time as emotion tags arrive!
         if (emotions.length > 0) {
@@ -74,15 +78,26 @@ export function App() {
           setCurrentEmotion(activeEmotion);
         }
 
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === aiMsgId
-              ? { ...msg, text: fullTextSoFar, emotions, actions }
-              : msg
-          )
-        );
+        // Stage 3.1.3: Throttle React state re-renders to 60 FPS (1 frame per rAF) to eliminate 3D viewport stutter
+        if (!updateFrameId) {
+          updateFrameId = requestAnimationFrame(() => {
+            updateFrameId = null;
+            const { emotions: currEmotions, actions: currActions } = parseResponseText(latestText);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMsgId
+                  ? { ...msg, text: latestText, emotions: currEmotions, actions: currActions }
+                  : msg
+              )
+            );
+          });
+        }
       },
       (fullText, emotions, actions) => {
+        if (updateFrameId) {
+          cancelAnimationFrame(updateFrameId);
+          updateFrameId = null;
+        }
         setIsLoading(false);
         const activeEmotion = emotions[0] || 'happy';
         setCurrentEmotion(activeEmotion);
@@ -104,6 +119,10 @@ export function App() {
         speakMessage(finalMsg);
       },
       (err) => {
+        if (updateFrameId) {
+          cancelAnimationFrame(updateFrameId);
+          updateFrameId = null;
+        }
         console.error("Streaming error:", err);
         setIsLoading(false);
       }
