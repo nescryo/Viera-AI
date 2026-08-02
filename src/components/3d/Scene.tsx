@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { MMDLoader } from 'three-stdlib';
 import * as MMDParser from 'mmd-parser';
 import type { Persona } from '../../types';
+import { ttsService } from '../../services/ttsService';
 
 if (typeof window !== 'undefined') {
   (window as any).MMDParser = MMDParser;
@@ -356,14 +357,107 @@ export const Scene: React.FC<SceneProps> = React.memo(({
       }
     );
 
-    // 7. Mouse & Touch Pointer Tracking
-    const handlePointerMove = (clientX: number, clientY: number) => {
-      if (isDisposed) return;
-      const windowWidth = window.innerWidth;
-      const windowHeight = window.innerHeight;
+    // 7. Raycaster 3D Touch & Sparkle Particles System
+    const raycaster = new THREE.Raycaster();
+    const mouseVector = new THREE.Vector2();
+    let headPatTiltTimer = 0;
 
-      pointerRef.current.targetX = (clientX / windowWidth) * 2 - 1;
-      pointerRef.current.targetY = -(clientY / windowHeight) * 2 + 1;
+    // Sparkles particle geometry for head pats
+    const sparkleCount = 30;
+    const sparkleGeo = new THREE.BufferGeometry();
+    const sparklePos = new Float32Array(sparkleCount * 3);
+    const sparkleVel = new Float32Array(sparkleCount * 3);
+    const sparkleLife = new Float32Array(sparkleCount);
+
+    sparkleGeo.setAttribute('position', new THREE.BufferAttribute(sparklePos, 3));
+    const sparkleMat = new THREE.PointsMaterial({
+      color: 0xffd700,
+      size: 0.045,
+      transparent: true,
+      opacity: 0
+    });
+    const sparkleParticles = new THREE.Points(sparkleGeo, sparkleMat);
+    scene.add(sparkleParticles);
+
+    const triggerSparkles = (hitPoint: THREE.Vector3) => {
+      sparkleMat.opacity = 0.95;
+      const posAttr = sparkleGeo.attributes.position as THREE.BufferAttribute;
+      const positions = posAttr.array as Float32Array;
+
+      for (let i = 0; i < sparkleCount; i++) {
+        positions[i * 3] = hitPoint.x + (Math.random() - 0.5) * 0.3;
+        positions[i * 3 + 1] = hitPoint.y + (Math.random() - 0.5) * 0.3;
+        positions[i * 3 + 2] = hitPoint.z + (Math.random() - 0.5) * 0.3;
+
+        sparkleVel[i * 3] = (Math.random() - 0.5) * 0.015;
+        sparkleVel[i * 3 + 1] = Math.random() * 0.02 + 0.01;
+        sparkleVel[i * 3 + 2] = (Math.random() - 0.5) * 0.015;
+
+        sparkleLife[i] = 1.0;
+      }
+      posAttr.needsUpdate = true;
+    };
+
+    const updatePointerTracking = (clientX: number, clientY: number) => {
+      if (isDisposed) return;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      pointerRef.current.targetX = (clientX / w) * 2 - 1;
+      pointerRef.current.targetY = -(clientY / h) * 2 + 1;
+    };
+
+    const handlePointerMove = (clientX: number, clientY: number) => {
+      updatePointerTracking(clientX, clientY);
+    };
+
+    const handlePointerClick = (clientX: number, clientY: number) => {
+      if (isDisposed || !containerRef.current || !mmdMeshRef.current) return;
+      updatePointerTracking(clientX, clientY);
+
+      const rect = containerRef.current.getBoundingClientRect();
+      mouseVector.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      mouseVector.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouseVector, camera);
+      const intersects = raycaster.intersectObject(mmdMeshRef.current, false);
+
+      if (intersects.length > 0) {
+        const hit = intersects[0];
+        const hitPoint = hit.point;
+        const relX = Math.abs(hitPoint.x - (-0.65)); // Relative X offset from Firefly model center (-0.65)
+
+        // Strict Head Pat Zone ONLY (Top of Head & Hair: y >= 1.35 and relX < 0.28)
+        if (relX < 0.28 && hitPoint.y >= 1.35) {
+          currentEmotionRef.current = 'blush';
+          onSelectEmotion?.('blush');
+          headPatTiltTimer = 1.0;
+          triggerSparkles(hitPoint);
+
+          const interjections = ["E-Eh??", "Hmmm...", "H-Huh...?"];
+          const pickedVoice = interjections[Math.floor(Math.random() * interjections.length)];
+
+          ttsService.speak(
+            pickedVoice,
+            currentPersona,
+            () => { isSpeakingRef.current = true; },
+            () => { isSpeakingRef.current = false; }
+          );
+        } 
+        // Strict Chest Ribbon Zone ONLY (Center Ribbon: 1.08 <= y < 1.35 and relX < 0.18)
+        else if (relX < 0.18 && hitPoint.y >= 1.08 && hitPoint.y < 1.35) {
+          currentEmotionRef.current = 'surprised';
+          onSelectEmotion?.('surprised');
+          triggerSparkles(hitPoint);
+
+          ttsService.speak(
+            "H-Huh...?",
+            currentPersona,
+            () => { isSpeakingRef.current = true; },
+            () => { isSpeakingRef.current = false; }
+          );
+        }
+        // All other body parts (arms, shoulders, skirt, legs): ZERO reaction
+      }
     };
 
     const onMouseMove = (e: MouseEvent) => {
@@ -375,6 +469,15 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
       }
     };
+
+    const onClick = (e: MouseEvent) => {
+      handlePointerClick(e.clientX, e.clientY);
+    };
+
+    const containerEl = containerRef.current;
+    if (containerEl) {
+      containerEl.addEventListener('click', onClick);
+    }
 
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('touchmove', onTouchMove);
@@ -396,6 +499,17 @@ export const Scene: React.FC<SceneProps> = React.memo(({
       else if (rawEmo === 'calm' || rawEmo === 'peaceful') emo = 'relaxed';
       else if (rawEmo === 'shocked') emo = 'surprised';
 
+      // Lightweight Hover Cursor Check (0.0001ms execution time)
+      if (containerRef.current) {
+        const px = pointerRef.current.targetX;
+        const py = pointerRef.current.targetY;
+        if (px >= -0.45 && px <= 0.45 && py >= 0.05 && py <= 0.85) {
+          containerRef.current.style.cursor = 'pointer';
+        } else {
+          containerRef.current.style.cursor = 'default';
+        }
+      }
+
       pointerRef.current.x += (pointerRef.current.targetX - pointerRef.current.x) * 0.05;
       pointerRef.current.y += (pointerRef.current.targetY - pointerRef.current.y) * 0.05;
 
@@ -408,8 +522,29 @@ export const Scene: React.FC<SceneProps> = React.memo(({
       const targetTorsoYaw = pX * 0.18;
       const targetTorsoPitch = -pY * 0.08;
 
+      let headTiltAdd = 0;
+      if (headPatTiltTimer > 0) {
+        headPatTiltTimer -= 0.016;
+        const progress = Math.max(0, headPatTiltTimer / 1.0);
+        headTiltAdd = Math.sin(progress * Math.PI) * 0.12;
+      }
+
+      // Update Sparkle Particles position & opacity
+      if (sparkleMat.opacity > 0) {
+        sparkleMat.opacity -= 0.018;
+        const posAttr = sparkleGeo.attributes.position as THREE.BufferAttribute;
+        const positions = posAttr.array as Float32Array;
+
+        for (let i = 0; i < sparkleCount; i++) {
+          positions[i * 3] += sparkleVel[i * 3];
+          positions[i * 3 + 1] += sparkleVel[i * 3 + 1];
+          positions[i * 3 + 2] += sparkleVel[i * 3 + 2];
+        }
+        posAttr.needsUpdate = true;
+      }
+
       const targetHeadYaw = pX * 0.32;
-      const targetHeadPitch = -pY * 0.16;
+      const targetHeadPitch = -pY * 0.16 + headTiltAdd;
 
       const breathPhase = Math.sin(elapsedTime * 2.2);
       modelGroup.position.y = breathPhase * 0.003; 
@@ -648,6 +783,9 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     return () => {
       isDisposed = true;
       cancelAnimationFrame(animationFrameId);
+      if (containerEl) {
+        containerEl.removeEventListener('click', onClick);
+      }
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('resize', handleResize);

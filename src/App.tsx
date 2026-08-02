@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import type { ChatMessage, Persona, ApiConfig } from './types';
 import { FIREFLY_PERSONA } from './data/personas';
 import { sendStreamingChatMessage, parseResponseText } from './services/aiService';
@@ -160,13 +160,17 @@ export function App() {
     }
   };
 
+  const handleSelectEmotion = useCallback((emotion: string) => {
+    setCurrentEmotion(emotion);
+  }, []);
+
   return (
     <div className="app-container">
       <Scene 
         currentPersona={currentPersona}
         isSpeaking={isSpeaking}
         currentEmotion={currentEmotion}
-        onSelectEmotion={(emotion) => setCurrentEmotion(emotion)}
+        onSelectEmotion={handleSelectEmotion}
       />
 
       <Header
