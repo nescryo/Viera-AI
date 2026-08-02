@@ -544,18 +544,48 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           targetSmallMouth = 0.35;
         }
 
-        // Clearly Visible & Rhythmic Anime Lip-Sync Mouth Flap (0.00 Closed -> 0.52 Open)
+        // Organic Emotion-Contextual Anime Speech Wave Generator (Sad, Angry, Blush, Happy)
         if (isSpeakingRef.current) {
-          // Maintain cute smile base
-          targetSmileMouth = 0.35;
+          const t = elapsedTime;
+          // Multi-frequency irregular harmonics
+          const speechWave1 = Math.sin(t * 13.5);
+          const speechWave2 = Math.sin(t * 23.7) * 0.4;
+          const speechWave3 = Math.cos(t * 8.3) * 0.3;
+          const noisePause = Math.sin(t * 3.1);
 
-          // Fluctuate cleanly between 0.00 (fully closed) and 0.52 (open) so mouth opening/closing is 100% visible
-          const rawWave = Math.sin(elapsedTime * 14.0);
-          const mouthOpenWave = Math.pow(Math.abs(rawWave), 1.2);
+          // Syllable micro-pauses (brief rest when speaker pauses between words)
+          const organicFactor = noisePause < -0.3 ? 0.08 : 1.0;
 
-          targetVowelA = mouthOpenWave * 0.52; // 0.00 -> 0.52 -> 0.00 (clearly visible rhythm!)
-          targetVowelI = Math.abs(Math.cos(elapsedTime * 10.0)) * 0.15;
-          targetVowelE = Math.abs(Math.sin(elapsedTime * 12.0)) * 0.10;
+          const combinedWave = Math.max(0, (speechWave1 + speechWave2 + speechWave3) * 0.55);
+          const openPower = Math.pow(combinedWave, 1.1) * organicFactor;
+
+          if (emo === 'sad') {
+            // Melancholy speech: NO smile, keep gentle sad downturned mouth corners (0.22)
+            targetSmileMouth = 0;
+            targetFrownMouth = 0.22;
+            targetSmallMouth = 0;
+            targetVowelA = Math.min(0.35, openPower * 0.40);
+            targetVowelI = Math.abs(Math.sin(t * 9.0)) * 0.15 * organicFactor;
+            targetVowelO = Math.abs(Math.sin(t * 6.0)) * 0.20 * organicFactor;
+          } else if (emo === 'angry') {
+            // Determined/Angry speech: NO smile, keep firm mouth tension
+            targetSmileMouth = 0;
+            targetFrownMouth = 0.28;
+            targetSmallMouth = 0;
+            targetVowelA = Math.min(0.42, openPower * 0.48);
+          } else if (emo === 'blush') {
+            // Shy speech: keep subtle blushing small mouth
+            targetSmileMouth = 0.20;
+            targetSmallMouth = 0.25 * (1 - openPower);
+            targetVowelA = Math.min(0.35, openPower * 0.38);
+          } else {
+            // Happy / Relaxed / Neutral speech: sweet anime smile base
+            targetSmileMouth = 0.35;
+            targetVowelA = Math.min(0.52, openPower * 0.55);
+            targetVowelI = Math.abs(Math.sin(t * 11.2)) * 0.22 * organicFactor;
+            targetVowelE = Math.abs(Math.cos(t * 17.4)) * 0.18 * organicFactor;
+            targetVowelO = Math.abs(Math.sin(t * 6.8)) * 0.25 * organicFactor;
+          }
         }
 
         // Smoothly fade soft rose-peach cheekbone blush
