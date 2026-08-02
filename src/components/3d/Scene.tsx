@@ -519,6 +519,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 
         if (emo === 'happy') {
           targetSmileMouth = 0.55;
+          targetVowelA = 0.32; // Firefly signature cute open-mouth smile :D
           targetRelaxedEyebrow = 0.25;
         } else if (emo === 'blush') {
           targetSmallMouth = 0.45;
@@ -530,7 +531,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         } else if (emo === 'surprised') {
           targetSurprisedEye = 0.85;
           targetSurprisedEyebrow = 0.75;
-          targetVowelO = 0.65;
+          targetVowelO = 0.55;
         } else if (emo === 'angry') {
           targetAngryEyebrow = 0.95;
           targetAngryEye = 0.55;
@@ -543,19 +544,18 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           targetSmallMouth = 0.35;
         }
 
-        // High-Amplitude Expressive 3D Lip-Sync Mouth Flap Animation when Firefly speaks
+        // Gentle, Sweet Anime Lip-Sync Mouth Flap Animation (0.15 to 0.38 max)
         if (isSpeakingRef.current) {
-          // Suppress static smile so mouth can open fully
-          targetSmileMouth *= 0.15;
+          // Keep Firefly's sweet smile active while speaking
+          targetSmileMouth = Math.max(targetSmileMouth, 0.40);
 
-          // Organic high-amplitude mouth opening/closing wave (0.0 to 0.92)
-          const rawWave = Math.sin(elapsedTime * 15.0);
-          const openPower = Math.pow(Math.abs(rawWave), 1.3);
+          // Gentle anime mouth flap opening (between 0.15 and 0.38 max)
+          const rawWave = Math.sin(elapsedTime * 14.0);
+          const openPower = Math.abs(rawWave);
 
-          targetVowelA = openPower * 0.92;
-          targetVowelI = Math.abs(Math.cos(elapsedTime * 11.0)) * 0.38;
-          targetVowelE = Math.abs(Math.sin(elapsedTime * 13.0)) * 0.25;
-          targetVowelO = Math.abs(Math.sin(elapsedTime * 7.0)) * 0.30;
+          targetVowelA = 0.15 + openPower * 0.23; // 0.15 to 0.38 max (sweet anime mouth movement)
+          targetVowelI = Math.abs(Math.cos(elapsedTime * 10.0)) * 0.18;
+          targetVowelE = Math.abs(Math.sin(elapsedTime * 12.0)) * 0.12;
         }
 
         // Smoothly fade soft rose-peach cheekbone blush
