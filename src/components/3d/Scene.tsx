@@ -475,12 +475,16 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           }
         }
 
-        // Morph Target Lookups
-        const morphSmileMouth  = getMorphIdx('口角上げ') ?? getMorphIdx('あ');
-        const morphOpenMouth   = getMorphIdx('あ') ?? getMorphIdx('い');
-        const morphSmallMouth  = getMorphIdx('ん') ?? getMorphIdx('へ');
-        const morphFrownMouth  = getMorphIdx('口角下げ') ?? getMorphIdx('▲') ?? getMorphIdx('△');
-        const morphSurprisedMouth = getMorphIdx('お') ?? getMorphIdx('ワ');
+        // MMD Vowel Morph Target Lookups
+        const morphVowelA  = getMorphIdx('あ');
+        const morphVowelI  = getMorphIdx('い');
+        const morphVowelU  = getMorphIdx('う');
+        const morphVowelE  = getMorphIdx('え');
+        const morphVowelO  = getMorphIdx('お');
+
+        const morphSmileMouth = getMorphIdx('口角上げ');
+        const morphSmallMouth = getMorphIdx('ん') ?? getMorphIdx('へ');
+        const morphFrownMouth = getMorphIdx('口角下げ') ?? getMorphIdx('▲') ?? getMorphIdx('△');
 
         const morphRelaxedEye  = getMorphIdx('じと目') ?? getMorphIdx('笑い');
         const morphRelaxedEyebrow = getMorphIdx('にこり') ?? getMorphIdx('下');
@@ -495,10 +499,14 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         const morphSurprisedEyebrow = getMorphIdx('上');
 
         let targetSmileMouth = 0;
-        let targetOpenMouth = 0;
         let targetSmallMouth = 0;
         let targetFrownMouth = 0;
-        let targetSurprisedMouth = 0;
+
+        let targetVowelA = 0;
+        let targetVowelI = 0;
+        let targetVowelU = 0;
+        let targetVowelE = 0;
+        let targetVowelO = 0;
 
         let targetRelaxedEye = 0;
         let targetRelaxedEyebrow = 0;
@@ -511,7 +519,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 
         if (emo === 'happy') {
           targetSmileMouth = 0.55;
-          targetOpenMouth = 0.35;
           targetRelaxedEyebrow = 0.25;
         } else if (emo === 'blush') {
           targetSmallMouth = 0.45;
@@ -523,7 +530,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         } else if (emo === 'surprised') {
           targetSurprisedEye = 0.85;
           targetSurprisedEyebrow = 0.75;
-          targetSurprisedMouth = 0.65;
+          targetVowelO = 0.65;
         } else if (emo === 'angry') {
           targetAngryEyebrow = 0.95;
           targetAngryEye = 0.55;
@@ -536,11 +543,19 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           targetSmallMouth = 0.35;
         }
 
-        // Real-Time 3D Lip-Sync Mouth Flap Animation when Firefly speaks
+        // High-Amplitude Expressive 3D Lip-Sync Mouth Flap Animation when Firefly speaks
         if (isSpeakingRef.current) {
-          const mouthFlapPhase = Math.abs(Math.sin(elapsedTime * 14.0));
-          targetOpenMouth = Math.max(targetOpenMouth, mouthFlapPhase * 0.55);
-          targetSmileMouth = Math.max(targetSmileMouth, (1 - mouthFlapPhase) * 0.35);
+          // Suppress static smile so mouth can open fully
+          targetSmileMouth *= 0.15;
+
+          // Organic high-amplitude mouth opening/closing wave (0.0 to 0.92)
+          const rawWave = Math.sin(elapsedTime * 15.0);
+          const openPower = Math.pow(Math.abs(rawWave), 1.3);
+
+          targetVowelA = openPower * 0.92;
+          targetVowelI = Math.abs(Math.cos(elapsedTime * 11.0)) * 0.38;
+          targetVowelE = Math.abs(Math.sin(elapsedTime * 13.0)) * 0.25;
+          targetVowelO = Math.abs(Math.sin(elapsedTime * 7.0)) * 0.30;
         }
 
         // Smoothly fade soft rose-peach cheekbone blush
@@ -557,11 +572,15 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           targetMap.set(idx, Math.max(curr, val));
         };
 
+        setMorphTarget(morphVowelA, targetVowelA);
+        setMorphTarget(morphVowelI, targetVowelI);
+        setMorphTarget(morphVowelU, targetVowelU);
+        setMorphTarget(morphVowelE, targetVowelE);
+        setMorphTarget(morphVowelO, targetVowelO);
+
         setMorphTarget(morphSmileMouth, targetSmileMouth);
-        setMorphTarget(morphOpenMouth, targetOpenMouth);
         setMorphTarget(morphSmallMouth, targetSmallMouth);
         setMorphTarget(morphFrownMouth, targetFrownMouth);
-        setMorphTarget(morphSurprisedMouth, targetSurprisedMouth);
 
         setMorphTarget(morphRelaxedEye, targetRelaxedEye);
         setMorphTarget(morphRelaxedEyebrow, targetRelaxedEyebrow);
