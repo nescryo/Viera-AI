@@ -25,17 +25,41 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showUploader, setShowUploader] = useState(false);
 
-  // API Configuration (LM Studio local default)
-  const [apiConfig, setApiConfig] = useState<ApiConfig>({
-    provider: 'lmstudio',
-    lmStudioUrl: 'http://localhost:1234/v1',
-    lmStudioModel: 'local-model',
-    geminiApiKey: '',
-    openRouterApiKey: '',
-    openRouterModel: '',
-    ttsProvider: 'voicevox',
-    voicevoxSpeakerId: 0
+  // API Configuration (Auto-detects DeepSeek from .env or localStorage)
+  const [apiConfig, setApiConfig] = useState<ApiConfig>(() => {
+    const saved = localStorage.getItem('viera_api_config');
+    const envKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          ...parsed,
+          provider: parsed.provider || 'deepseek',
+          deepseekModel: parsed.deepseekModel || 'deepseek-chat',
+          deepseekApiKey: parsed.deepseekApiKey || envKey || ''
+        };
+      } catch (e) {
+        console.warn("Failed to parse saved apiConfig:", e);
+      }
+    }
+    return {
+      provider: 'deepseek',
+      lmStudioUrl: 'http://localhost:1234/v1',
+      lmStudioModel: 'local-model',
+      deepseekApiKey: envKey || '',
+      deepseekModel: 'deepseek-chat',
+      geminiApiKey: '',
+      openRouterApiKey: '',
+      openRouterModel: '',
+      ttsProvider: 'voicevox',
+      voicevoxSpeakerId: 0
+    };
   });
+
+  const handleSaveConfig = (newConfig: ApiConfig) => {
+    setApiConfig(newConfig);
+    localStorage.setItem('viera_api_config', JSON.stringify(newConfig));
+  };
 
   const handleSendMessage = async (text: string) => {
     const userMsg: ChatMessage = {
@@ -218,7 +242,7 @@ export function App() {
       {showSettings && (
         <SettingsModal
           apiConfig={apiConfig}
-          onSaveConfig={(newConfig) => setApiConfig(newConfig)}
+          onSaveConfig={handleSaveConfig}
           onClose={() => setShowSettings(false)}
         />
       )}
