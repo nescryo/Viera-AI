@@ -1,14 +1,14 @@
-# 🔄 Viera — System Architecture & Workflow Guide
+# Viera — System Architecture & Workflow Guide
 
 This document outlines the system architecture, data flow pipelines, and interactive workflows of **Viera**, making it easy for reviewers and developers to understand how the 3D graphics, local AI, and voice synthesis modules interact.
 
 ---
 
-## 🏛️ 1. High-Level Architecture Overview
+## 1. High-Level Architecture Overview
 
 ```mermaid
 graph TD
-    A["👤 User Input (Chat / 3D Touch)"] --> B["🖥️ React 19 Frontend UI"]
+    A[" User Input (Chat / 3D Touch)"] --> B["🖥️ React 19 Frontend UI"]
     
     subgraph "AI & Natural Language Processing"
         B -->|Send Message| C["🧠 LM Studio / Cloud LLM"]
@@ -37,9 +37,9 @@ graph TD
 
 ---
 
-## 🔄 2. Core Workflows
+## 2. Core Workflows
 
-### 💬 Workflow 1: Dual-Language Chat & Voice Synthesis Pipeline
+### Workflow 1: Dual-Language Chat & Voice Synthesis Pipeline
 
 ```mermaid
 sequenceDiagram
@@ -68,7 +68,7 @@ sequenceDiagram
 
 ---
 
-### 🖐️ Workflow 2: 3D Raycasting Touch & Head Pat Interaction
+### Workflow 2: 3D Raycasting Touch & Head Pat Interaction
 
 ```mermaid
 flowchart TD
@@ -91,7 +91,7 @@ flowchart TD
 
 ---
 
-## ⚙️ 3. Component Interaction Matrix
+## 3. Component Interaction Matrix
 
 | Component | Responsibility | Key File |
 | :--- | :--- | :--- |
@@ -103,7 +103,7 @@ flowchart TD
 
 ---
 
-## 🚀 Summary for Reviewers
+## Summary for Reviewers
 
 Viera operates on a **Dual-Channel Processing Model**:
 - **Audio Channel**: Direct native Japanese streaming from LLM to local VOICEVOX engine for 0ms voice synthesis latency.

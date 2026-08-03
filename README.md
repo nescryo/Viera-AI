@@ -2,7 +2,7 @@
 
 **Viera** is an ultra-immersive, interactive 3D anime companion application powered by **Three.js / WebGL 3D MMD Models**, **LM Studio Local AI**, and **VOICEVOX Japanese Anime Text-to-Speech Engine**.
 
-Featuring **Firefly (AR-26710)** from *Honkai: Star Rail*, Viera combines 60 FPS 3D raycasting touch interactions, real-time facial blendshape emotions, instant English-to-Japanese anime voice dubbing, and a sleek modern dark-glass UI.
+Featuring **Firefly (AR-26710)** from *Honkai: Star Rail*, Viera combines 3D raycasting touch interactions, real-time facial blendshape emotions, instant English-to-Japanese anime voice dubbing, and a sleek modern dark-glass UI.
 
 ---
 
