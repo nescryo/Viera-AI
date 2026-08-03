@@ -56,6 +56,95 @@ export async function sendStreamingChatMessage(
     content: `${persona.systemPrompt}\n\nMaintain character at all times. Use asterisks for actions like *smiles* or *gestures*, and use emotion tags like [happy], [blush], [relaxed], [surprised], [angry], [sad], or [neutral] when appropriate.`
   };
 
+  if (apiConfig.provider === 'deepseek') {
+    const apiKey = apiConfig.deepseekApiKey || import.meta.env.VITE_DEEPSEEK_API_KEY || '';
+    if (!apiKey) {
+      const errMsg = "DeepSeek API Key belum diisi! Silakan masukkan di Settings atau simpan di file .env (VITE_DEEPSEEK_API_KEY).";
+      console.error(errMsg);
+      onError(new Error(errMsg));
+      simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete);
+      return;
+    }
+
+    try {
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: apiConfig.deepseekModel || 'deepseek-chat',
+          messages: [systemMessage, ...formattedHistory],
+          temperature: 0.8,
+          max_tokens: 300,
+          stream: true
+        })
+      });
+
+      if (!response.ok || !response.body) {
+        let errText = '';
+        try {
+          const errJson = await response.json();
+          errText = errJson?.error?.message || response.statusText;
+        } catch {
+          errText = `HTTP status ${response.status}`;
+        }
+        throw new Error(`DeepSeek API error: ${errText}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let fullText = '';
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed === 'data: [DONE]') continue;
+          if (trimmed.startsWith('data: ')) {
+            try {
+              const json = JSON.parse(trimmed.substring(6));
+              const content = json.choices?.[0]?.delta?.content || '';
+              if (content) {
+                fullText += content;
+                onToken(content, fullText);
+              }
+            } catch {
+              // Ignore partial JSON parse errors
+            }
+          }
+        }
+      }
+
+      if (buffer.trim().startsWith('data: ') && buffer.trim() !== 'data: [DONE]') {
+        try {
+          const json = JSON.parse(buffer.trim().substring(6));
+          const content = json.choices?.[0]?.delta?.content || '';
+          if (content) fullText += content;
+        } catch {
+          // Ignore
+        }
+      }
+
+      const { emotions, actions } = parseResponseText(fullText);
+      onComplete(fullText, emotions, actions);
+      return;
+    } catch (err) {
+      console.error("DeepSeek API streaming failed:", err);
+      onError(err);
+      simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete);
+      return;
+    }
+  }
+
   if (apiConfig.provider === 'lmstudio') {
     try {
       const response = await fetch(`${apiConfig.lmStudioUrl}/chat/completions`, {
