@@ -34,7 +34,7 @@ export function App() {
         const parsed = JSON.parse(saved);
         return {
           ...parsed,
-          provider: 'deepseek',
+          provider: parsed.provider || 'deepseek',
           deepseekModel: parsed.deepseekModel || 'deepseek-chat',
           deepseekApiKey: parsed.deepseekApiKey || envKey || ''
         };
