@@ -30,7 +30,7 @@ export interface Persona {
   category: 'Honkai: Star Rail' | 'Anime & Gaming' | 'Original';
 }
 
-export type ApiProvider = 'lmstudio' | 'gemini' | 'openrouter' | 'mock';
+export type ApiProvider = 'deepseek' | 'lmstudio' | 'gemini' | 'openrouter' | 'mock';
 
 export type TtsProvider = 'edge' | 'vits' | 'voicevox' | 'style-bert-vits2' | 'webspeech';
 
@@ -38,6 +38,8 @@ export interface ApiConfig {
   provider: ApiProvider;
   lmStudioUrl: string;
   lmStudioModel: string;
+  deepseekApiKey?: string;
+  deepseekModel?: string;
   geminiApiKey: string;
   openRouterApiKey: string;
   openRouterModel: string;
