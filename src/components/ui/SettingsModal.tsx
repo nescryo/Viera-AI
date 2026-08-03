@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { ApiConfig, ApiProvider, TtsProvider } from '../../types';
-import { X, Save, Server, Cpu, CheckCircle, Volume2, Mic, Radio } from 'lucide-react';
+import { X, Save, Server, Cpu, CheckCircle, Volume2, Mic, Radio, Sparkles, Key } from 'lucide-react';
 
 interface SettingsModalProps {
   apiConfig: ApiConfig;
@@ -16,6 +16,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [provider, setProvider] = useState<ApiProvider>(apiConfig.provider);
   const [lmStudioUrl, setLmStudioUrl] = useState(apiConfig.lmStudioUrl);
   const [lmStudioModel, setLmStudioModel] = useState(apiConfig.lmStudioModel);
+  const [deepseekApiKey, setDeepseekApiKey] = useState(apiConfig.deepseekApiKey || '');
+  const [deepseekModel, setDeepseekModel] = useState(apiConfig.deepseekModel || 'deepseek-chat');
   const [ttsProvider, setTtsProvider] = useState<TtsProvider>(apiConfig.ttsProvider || 'voicevox');
   const [vitsServerUrl, setVitsServerUrl] = useState(apiConfig.vitsServerUrl || 'http://localhost:5000/tts');
 
@@ -28,6 +30,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       provider,
       lmStudioUrl,
       lmStudioModel,
+      deepseekApiKey,
+      deepseekModel,
       ttsProvider,
       vitsServerUrl,
       voicevoxSpeakerId
@@ -52,6 +56,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="form-group">
             <label className="form-label">1. Select AI Text Provider</label>
             <div className="provider-selector-grid">
+              <button
+                type="button"
+                className={`provider-card ${provider === 'deepseek' ? 'active' : ''}`}
+                onClick={() => setProvider('deepseek')}
+              >
+                <Sparkles size={24} style={{ color: '#3b82f6' }} />
+                <div className="provider-card-info">
+                  <span className="p-title">DeepSeek AI (Cloud API)</span>
+                  <span className="p-desc">High Quality RP • 20M+ Tokens</span>
+                </div>
+                {provider === 'deepseek' && <CheckCircle size={18} className="p-check" />}
+              </button>
+
               <button
                 type="button"
                 className={`provider-card ${provider === 'lmstudio' ? 'active' : ''}`}
@@ -79,6 +96,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
             </div>
           </div>
+
+          {provider === 'deepseek' && (
+            <div className="provider-details-box fade-in">
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Key size={14} /> DeepSeek API Key (or save in .env file)
+                </label>
+                <input
+                  type="password"
+                  value={deepseekApiKey}
+                  onChange={(e) => setDeepseekApiKey(e.target.value)}
+                  placeholder={import.meta.env.VITE_DEEPSEEK_API_KEY ? "Detected from .env file (VITE_DEEPSEEK_API_KEY)" : "sk-xxxxxxxxxxxxxxxxxxxxxxxx"}
+                  className="form-input"
+                />
+                {import.meta.env.VITE_DEEPSEEK_API_KEY && !deepseekApiKey && (
+                  <small style={{ color: '#10b981', marginTop: '4px', display: 'block' }}>
+                    ✓ API Key automatically detected from .env file!
+                  </small>
+                )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">DeepSeek Model</label>
+                <select
+                  value={deepseekModel}
+                  onChange={(e) => setDeepseekModel(e.target.value)}
+                  className="form-input"
+                >
+                  <option value="deepseek-chat">⚡ deepseek-chat (DeepSeek-V3: Recommended for Roleplay & 3D Expressions)</option>
+                  <option value="deepseek-reasoner">🧠 deepseek-reasoner (DeepSeek-R1: Deep Chain-of-Thought Reasoning)</option>
+                </select>
+              </div>
+            </div>
+          )}
 
           {provider === 'lmstudio' && (
             <div className="provider-details-box fade-in">
