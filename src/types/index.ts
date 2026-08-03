@@ -32,6 +32,8 @@ export interface Persona {
 
 export type ApiProvider = 'lmstudio' | 'gemini' | 'openrouter' | 'mock';
 
+export type TtsProvider = 'edge' | 'vits' | 'voicevox' | 'style-bert-vits2' | 'webspeech';
+
 export interface ApiConfig {
   provider: ApiProvider;
   lmStudioUrl: string;
@@ -39,6 +41,11 @@ export interface ApiConfig {
   geminiApiKey: string;
   openRouterApiKey: string;
   openRouterModel: string;
+  ttsProvider?: TtsProvider;
+  vitsServerUrl?: string;
+  styleBertUrl?: string;
+  edgeVoice?: string;
+  voicevoxSpeakerId?: number;
 }
 
 export interface ExpressionState {
