@@ -32,7 +32,9 @@ export function App() {
     lmStudioModel: 'local-model',
     geminiApiKey: '',
     openRouterApiKey: '',
-    openRouterModel: ''
+    openRouterModel: '',
+    ttsProvider: 'voicevox',
+    voicevoxSpeakerId: 0
   });
 
   const handleSendMessage = async (text: string) => {
@@ -117,6 +119,24 @@ export function App() {
         );
 
         speakMessage(finalMsg);
+
+        // Async Reverse Translation: Display ONLY English Translated Text on Chat Screen!
+        if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(fullText)) {
+          ttsService.translateJapaneseToEnglish(fullText).then((enSub) => {
+            if (enSub && enSub !== fullText) {
+              const { emotions: currEmotions, actions: currActions } = parseResponseText(fullText);
+              const emotionPrefix = currEmotions.length > 0 ? `[${currEmotions[0]}] ` : '';
+              const actionPrefix = currActions.length > 0 ? `*${currActions[0]}* ` : '';
+              const englishOnlyText = `${emotionPrefix}${actionPrefix}${enSub}`;
+
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === aiMsgId ? { ...msg, text: englishOnlyText } : msg
+                )
+              );
+            }
+          });
+        }
       },
       (err) => {
         if (updateFrameId) {
@@ -142,7 +162,9 @@ export function App() {
       () => {
         setIsSpeaking(false);
         setActiveSpeakingId(null);
-      }
+      },
+      undefined,
+      apiConfig
     );
   };
 
@@ -171,6 +193,7 @@ export function App() {
         isSpeaking={isSpeaking}
         currentEmotion={currentEmotion}
         onSelectEmotion={handleSelectEmotion}
+        apiConfig={apiConfig}
       />
 
       <Header

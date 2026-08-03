@@ -1,32 +1,77 @@
-# React + TypeScript + Vite
+# 🌸 Viera — 3D Interactive Anime Roleplay Assistant
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+**Viera** is an ultra-immersive, interactive 3D anime companion application powered by **Three.js / WebGL 3D MMD Models**, **LM Studio Local AI**, and **VOICEVOX Japanese Anime Text-to-Speech Engine**.
 
-Currently, two official plugins are available:
+Featuring **Firefly (AR-26710)** from *Honkai: Star Rail*, Viera combines 60 FPS 3D raycasting touch interactions, real-time facial blendshape emotions, instant English-to-Japanese anime voice dubbing, and a sleek modern dark-glass UI.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## ✨ Key Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- 🎨 **Interactive 3D MMD Character**:
+  - **Head Pat Zone (`y >= 1.35`)**: Triggers soft porcelain cheek blush textures, head tilts, golden sparkle particles, and cute anime interjections.
+  - **Ribbon Touch Zone (`1.08 <= y < 1.35`)**: Triggers surprised facial expressions, sparkle bursts, and interjections.
+  - **60 FPS Raycasting Optimization**: Ultra-smooth mouse tracking without CPU lag.
 
-## Expanding the Oxlint configuration
+- 🎙️ **VOICEVOX Japanese Anime TTS**:
+  - Integrated local VOICEVOX engine (`http://localhost:50021`).
+  - **Customizable Anime Speakers**: Choose from 30+ character styles (Default: **Shikikoku Metan — Ama-ama / Sweet & Calm Anime Girl**).
+  - **Dynamic Prosody Modulation**: Automatic pitch and intonation adjustments for punctuation (`!`, `?`, `-`, `...`).
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+- 🌸 **English UI Text + Authentic Japanese Dubbing**:
+  - Chat screen displays **100% clean English text** for comfortable reading.
+  - Headphones play **authentic Japanese anime voice dubbing** translated on-the-fly.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+- ⚙️ **Modular AI Settings**:
+  - Compatible with **LM Studio** (Local offline LLM) and Demo roleplay engine.
+  - Scrollable modal with sticky save controls.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+1. **Node.js**: v18 or higher.
+2. **VOICEVOX Desktop Engine**: VOICEVOX AppImage or executable listening on `http://localhost:50021`.
+3. **LM Studio** (Optional for local AI): Server running on `http://localhost:1234/v1`.
+
+### 1. Installation
+
+```bash
+# Clone repository
+git clone https://github.com/nescryo/Viera-AI.git
+cd Viera
+
+# Install dependencies
+npm install
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+### 2. Start VOICEVOX Server
+
+```bash
+# Launch VOICEVOX AppImage
+~/.voicevox/VOICEVOX.AppImage --no-sandbox
+```
+
+### 3. Launch Viera Web App
+
+```bash
+npm run dev
+```
+
+Open your browser at **[http://localhost:5173](http://localhost:5173)**!
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend Framework**: React 19 + TypeScript + Vite
+- **3D Graphics Engine**: Three.js + three-stdlib (MMDLoader & Canvas Textures)
+- **Voice Engine**: VOICEVOX API (via Vite Proxy `/voicevox_api`)
+- **Styling**: Vanilla CSS (Custom Design System with Glassmorphism & Cyberpunk Neon Tokens)
+
+---
+
+## 📜 License
+
+Distributed under the MIT License. Built with ❤️ for Honkai: Star Rail and Anime AI Companion enthusiasts.

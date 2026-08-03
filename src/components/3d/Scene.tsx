@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { MMDLoader } from 'three-stdlib';
 import * as MMDParser from 'mmd-parser';
-import type { Persona } from '../../types';
+import type { ApiConfig, Persona } from '../../types';
 import { ttsService } from '../../services/ttsService';
 
 if (typeof window !== 'undefined') {
@@ -14,6 +14,7 @@ interface SceneProps {
   isSpeaking: boolean;
   currentEmotion: string;
   onSelectEmotion?: (emotion: string) => void;
+  apiConfig?: ApiConfig;
 }
 
 const TESTING_EMOTIONS = [
@@ -70,7 +71,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
   currentPersona,
   isSpeaking,
   currentEmotion,
-  onSelectEmotion
+  onSelectEmotion,
+  apiConfig
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const pointerRef = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
@@ -440,7 +442,9 @@ export const Scene: React.FC<SceneProps> = React.memo(({
             pickedVoice,
             currentPersona,
             () => { isSpeakingRef.current = true; },
-            () => { isSpeakingRef.current = false; }
+            () => { isSpeakingRef.current = false; },
+            undefined,
+            apiConfig
           );
         } 
         // Strict Chest Ribbon Zone ONLY (Center Ribbon: 1.08 <= y < 1.35 and relX < 0.18)
@@ -453,7 +457,9 @@ export const Scene: React.FC<SceneProps> = React.memo(({
             "H-Huh...?",
             currentPersona,
             () => { isSpeakingRef.current = true; },
-            () => { isSpeakingRef.current = false; }
+            () => { isSpeakingRef.current = false; },
+            undefined,
+            apiConfig
           );
         }
         // All other body parts (arms, shoulders, skirt, legs): ZERO reaction
