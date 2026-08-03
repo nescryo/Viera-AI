@@ -243,7 +243,12 @@ class TTSService {
       const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(cleanJa)}&langpair=ja|en`);
       const data = await res.json();
       if (data && data.responseData && data.responseData.translatedText) {
-        return data.responseData.translatedText;
+        const rawText = data.responseData.translatedText;
+        if (typeof DOMParser !== 'undefined') {
+          const doc = new DOMParser().parseFromString(rawText, 'text/html');
+          return doc.documentElement.textContent || rawText;
+        }
+        return rawText;
       }
     } catch (e) {
       console.warn("Auto JA->EN subtitle translation failed:", e);
@@ -327,11 +332,13 @@ class TTSService {
       };
 
       audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
         this.currentAudio = null;
         if (onEnd) onEnd();
       };
 
       audio.onerror = () => {
+        URL.revokeObjectURL(audioUrl);
         this.currentAudio = null;
         // Fallback to Edge Neural if VOICEVOX local server is offline
         this.speakEdgeNeural(text, persona, onStart, onEnd);
@@ -375,11 +382,13 @@ class TTSService {
       };
 
       audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
         this.currentAudio = null;
         if (onEnd) onEnd();
       };
 
       audio.onerror = () => {
+        URL.revokeObjectURL(audioUrl);
         this.currentAudio = null;
         this.speakEdgeNeural(text, persona, onStart, onEnd);
       };
@@ -418,11 +427,13 @@ class TTSService {
       };
 
       audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
         this.currentAudio = null;
         if (onEnd) onEnd();
       };
 
       audio.onerror = () => {
+        URL.revokeObjectURL(audioUrl);
         this.currentAudio = null;
         // Fallback to Edge Neural if VITS local server is offline
         this.speakEdgeNeural(text, persona, onStart, onEnd);

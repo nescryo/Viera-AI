@@ -44,7 +44,7 @@ class VitsHandler(BaseHTTPRequestHandler):
                     self.send_header('Access-Control-Allow-Origin', '*')
                     self.send_header('Content-Length', str(len(audio_data)))
                     self.end_headers()
-                    self.write(audio_data)
+                    self.wfile.write(audio_data)
                 else:
                     self.send_error(500, "Failed to generate audio")
             finally:

@@ -90,6 +90,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     isSpeakingRef.current = isSpeaking;
   }, [isSpeaking]);
 
+  const apiConfigRef = useRef(apiConfig);
+  useEffect(() => {
+    apiConfigRef.current = apiConfig;
+  }, [apiConfig]);
+
   // Ref to hold loaded MMD mesh, bones, cheek blush materials, and morph target dictionary
   const mmdMeshRef = useRef<THREE.SkinnedMesh | null>(null);
   const upperBodyBoneRef = useRef<THREE.Bone | null>(null);
@@ -444,7 +449,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
             () => { isSpeakingRef.current = true; },
             () => { isSpeakingRef.current = false; },
             undefined,
-            apiConfig
+            apiConfigRef.current
           );
         } 
         // Strict Chest Ribbon Zone ONLY (Center Ribbon: 1.08 <= y < 1.35 and relX < 0.18)
@@ -459,7 +464,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
             () => { isSpeakingRef.current = true; },
             () => { isSpeakingRef.current = false; },
             undefined,
-            apiConfig
+            apiConfigRef.current
           );
         }
         // All other body parts (arms, shoulders, skirt, legs): ZERO reaction

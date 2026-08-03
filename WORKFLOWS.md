@@ -95,11 +95,11 @@ flowchart TD
 
 | Component | Responsibility | Key File |
 | :--- | :--- | :--- |
-| **`App.tsx`** | Central state orchestrator, chat state management, and stream handling. | [`src/App.tsx`](file:///home/nescryo/Projects/Viera/src/App.tsx) |
-| **`Scene.tsx`** | Three.js 3D canvas viewport, MMD model loader, blush textures, and Raycasting touch handlers. | [`src/components/3d/Scene.tsx`](file:///home/nescryo/Projects/Viera/src/components/3d/Scene.tsx) |
-| **`ttsService.ts`** | VOICEVOX API integration, audio query modulation, and reverse translation bridge. | [`src/services/ttsService.ts`](file:///home/nescryo/Projects/Viera/src/services/ttsService.ts) |
-| **`SettingsModal.tsx`** | User configuration for AI providers, VOICEVOX character selection, and server URLs. | [`src/components/ui/SettingsModal.tsx`](file:///home/nescryo/Projects/Viera/src/components/ui/SettingsModal.tsx) |
-| **`personas.ts`** | Firefly character definitions, system prompts, and native anime Japanese roleplay rules. | [`src/data/personas.ts`](file:///home/nescryo/Projects/Viera/src/data/personas.ts) |
+| **`App.tsx`** | Central state orchestrator, chat state management, and stream handling. | [`src/App.tsx`](src/App.tsx) |
+| **`Scene.tsx`** | Three.js 3D canvas viewport, MMD model loader, blush textures, and Raycasting touch handlers. | [`src/components/3d/Scene.tsx`](src/components/3d/Scene.tsx) |
+| **`ttsService.ts`** | VOICEVOX API integration, audio query modulation, and reverse translation bridge. | [`src/services/ttsService.ts`](src/services/ttsService.ts) |
+| **`SettingsModal.tsx`** | User configuration for AI providers, VOICEVOX character selection, and server URLs. | [`src/components/ui/SettingsModal.tsx`](src/components/ui/SettingsModal.tsx) |
+| **`personas.ts`** | Firefly character definitions, system prompts, and native anime Japanese roleplay rules. | [`src/data/personas.ts`](src/data/personas.ts) |
 
 ---
 
