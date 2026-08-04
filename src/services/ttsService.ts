@@ -249,6 +249,14 @@ class TTSService {
   public stop() {
     this.audioQueue = [];
     this.isProcessingQueue = false;
+    if (this.currentBufferSource) {
+      try {
+        this.currentBufferSource.stop();
+      } catch (_) {
+        // ignore if already stopped
+      }
+      this.currentBufferSource = null;
+    }
     if (this.currentAudio) {
       this.currentAudio.pause();
       this.currentAudio = null;
