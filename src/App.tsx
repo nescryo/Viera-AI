@@ -133,6 +133,7 @@ export function App() {
           sender: 'ai',
           characterId: currentPersona.id,
           text: fullText,
+          originalText: fullText,
           emotions,
           actions,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -155,7 +156,7 @@ export function App() {
 
               setMessages((prev) =>
                 prev.map((msg) =>
-                  msg.id === aiMsgId ? { ...msg, text: englishOnlyText } : msg
+                  msg.id === aiMsgId ? { ...msg, text: englishOnlyText, originalText: fullText } : msg
                 )
               );
             }
@@ -178,7 +179,7 @@ export function App() {
     setIsSpeaking(true);
 
     ttsService.speak(
-      msg.text,
+      msg.originalText || msg.text,
       currentPersona,
       () => {
         setIsSpeaking(true);

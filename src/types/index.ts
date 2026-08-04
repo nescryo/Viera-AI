@@ -5,6 +5,7 @@ export interface ChatMessage {
   sender: SenderType;
   characterId: string;
   text: string;
+  originalText?: string;
   emotions?: string[];
   actions?: string[];
   timestamp: string;
@@ -54,4 +55,17 @@ export interface ExpressionState {
   currentEmotion: string;
   intensity: number;
   isSpeaking: boolean;
+}
+
+export interface VoicevoxStyle {
+  id: number;
+  name: string;
+  type?: string;
+}
+
+export interface VoicevoxSpeaker {
+  name: string;
+  speaker_uuid: string;
+  styles: VoicevoxStyle[];
+  version?: string;
 }

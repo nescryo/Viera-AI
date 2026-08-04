@@ -1,6 +1,47 @@
-import React, { useState } from 'react';
-import type { ApiConfig, ApiProvider, TtsProvider } from '../../types';
+import React, { useState, useEffect } from 'react';
+import type { ApiConfig, ApiProvider, TtsProvider, VoicevoxSpeaker } from '../../types';
 import { X, Save, Server, Cpu, CheckCircle, Volume2, Mic, Radio, Sparkles, Key } from 'lucide-react';
+
+const formatSpeakerName = (name: string): string => {
+  const map: Record<string, string> = {
+    '四国めたん': '🌸 Shikikoku Metan',
+    'ずんだもん': '⚡ Zundamon',
+    '春日部つむぎ': '🌾 Kasukabe Tsumugi',
+    '雨晴はう': '🎀 Amehare Hau',
+    '波音リツ': '📻 Namine Ritsu',
+    '冥鳴ひまり': '💕 Meimei Himari',
+    '九州そら': '☁️ Kyushu Sora',
+    'もち子さん': '🍡 Mochiko-san',
+    '剣崎牝犬': '⚔️ Kenzaki',
+    'ホワイトカルティ': '❄️ White Culita',
+    '後鬼': '👹 Goki',
+    'No.7': '🤖 No.7',
+    'ちび式じい': '👴 Chibi Shiki-jii',
+    '櫻歌ミコ': '🌸 Ouka Miko',
+    '小夜/Sayo': '🌙 Sayo',
+    'ナースロボ＿タイプＴ': '💉 Nurse Robot Type-T'
+  };
+  return map[name] || `🎙️ ${name}`;
+};
+
+const formatStyleName = (styleName: string): string => {
+  const map: Record<string, string> = {
+    'ノーマル': 'Normal',
+    'あまあま': 'Sweet (Ama-ama)',
+    'ツンツン': 'Tsundere',
+    'セクシー': 'Sexy',
+    'ささやき': 'Whisper',
+    'ヒソヒソ': 'Soft Whisper',
+    'ヘロヘロ': 'Dizzy',
+    'なみだめ': 'Tearful / Sad',
+    '喜び': 'Joy',
+    '悲しみ': 'Sadness',
+    '怒り': 'Angry',
+    '人前少女': 'Public Girl',
+    '酔い': 'Drunk'
+  };
+  return map[styleName] || styleName;
+};
 
 interface SettingsModalProps {
   apiConfig: ApiConfig;
@@ -22,6 +63,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [vitsServerUrl, setVitsServerUrl] = useState(apiConfig.vitsServerUrl || 'http://localhost:5000/tts');
 
   const [voicevoxSpeakerId, setVoicevoxSpeakerId] = useState<number>(apiConfig.voicevoxSpeakerId ?? 0);
+  const [speakers, setSpeakers] = useState<VoicevoxSpeaker[]>([]);
+
+  useEffect(() => {
+    if (ttsProvider === 'voicevox') {
+      fetch('/voicevox_api/speakers')
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data: VoicevoxSpeaker[]) => {
+          if (Array.isArray(data) && data.length > 0) {
+            setSpeakers(data);
+          }
+        })
+        .catch((err) => console.warn('Could not load live VOICEVOX speakers:', err));
+    }
+  }, [ttsProvider]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,19 +257,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {ttsProvider === 'voicevox' && (
             <div className="provider-details-box fade-in">
               <div className="form-group">
-                <label className="form-label">Select VOICEVOX Anime Voice Character</label>
+                <label className="form-label">Select VOICEVOX Base Character & Preferred Style</label>
                 <select
                   value={voicevoxSpeakerId}
                   onChange={(e) => setVoicevoxSpeakerId(Number(e.target.value))}
                   className="form-input"
                 >
-                  <option value={0}>🌸 四国めたん - Shikikoku Metan (Ama-ama / Sweet & Calm Anime Girl)</option>
-                  <option value={2}>✨ 四国めたん - Shikikoku Metan (Normal Anime Girl)</option>
-                  <option value={36}>🌙 四国めたん - Shikikoku Metan (Whisper / Soft)</option>
-                  <option value={10}>🎀 雨晴はう - Amehare Hau (Soft Gentle Nurse)</option>
-                  <option value={14}>💕 冥鳴ひまり - Meimei Himari (Cute Girl)</option>
-                  <option value={9}>📻 波音リツ - Namine Ritsu (Calm Female)</option>
-                  <option value={3}>⚡ ずんだもん - Zundamon (Energetic)</option>
+                  {speakers.length > 0 ? (
+                    speakers.map((spk) => (
+                      <optgroup key={spk.speaker_uuid || spk.name} label={formatSpeakerName(spk.name)}>
+                        {spk.styles.map((style) => (
+                          <option key={style.id} value={style.id}>
+                            {formatSpeakerName(spk.name)} - {formatStyleName(style.name)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))
+                  ) : (
+                    <>
+                      <option value={0}>🌸 Shikikoku Metan - Sweet (Ama-ama)</option>
+                      <option value={2}>✨ Shikikoku Metan - Normal</option>
+                      <option value={6}>💢 Shikikoku Metan - Tsundere</option>
+                      <option value={36}>🌙 Shikikoku Metan - Whisper</option>
+                      <option value={10}>🎀 Amehare Hau - Gentle Nurse</option>
+                      <option value={14}>💕 Meimei Himari - Cute Girl</option>
+                      <option value={9}>📻 Namine Ritsu - Calm Female</option>
+                      <option value={3}>⚡ Zundamon - Normal</option>
+                      <option value={1}>🍬 Zundamon - Sweet (Ama-ama)</option>
+                      <option value={7}>💢 Zundamon - Tsundere</option>
+                      <option value={38}>🌙 Zundamon - Whisper</option>
+                    </>
+                  )}
                 </select>
               </div>
             </div>
