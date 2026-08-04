@@ -36,6 +36,64 @@ export async function checkLmStudioConnection(lmStudioUrl: string): Promise<bool
 }
 
 /**
+ * Helper to process OpenAI-compatible SSE readable stream
+ */
+export async function readSSEResponseStream(
+  response: Response,
+  onToken: (token: string, fullTextSoFar: string) => void
+): Promise<string> {
+  if (!response.body) {
+    throw new Error('Response body is null');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let fullText = '';
+  let buffer = '';
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed === 'data: [DONE]') continue;
+      if (trimmed.startsWith('data: ')) {
+        try {
+          const json = JSON.parse(trimmed.substring(6));
+          const content = json.choices?.[0]?.delta?.content || '';
+          if (content) {
+            fullText += content;
+            onToken(content, fullText);
+          }
+        } catch {
+          // Ignore partial JSON parse errors
+        }
+      }
+    }
+  }
+
+  if (buffer.trim().startsWith('data: ') && buffer.trim() !== 'data: [DONE]') {
+    try {
+      const json = JSON.parse(buffer.trim().substring(6));
+      const content = json.choices?.[0]?.delta?.content || '';
+      if (content) {
+        fullText += content;
+        onToken(content, fullText);
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  return fullText;
+}
+
+/**
  * Sends chat message with real-time SSE token streaming support for LM Studio / OpenAI endpoints
  */
 export async function sendStreamingChatMessage(
@@ -66,6 +124,9 @@ export async function sendStreamingChatMessage(
       return;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     try {
       const response = await fetch('https://api.deepseek.com/chat/completions', {
         method: 'POST',
@@ -79,10 +140,12 @@ export async function sendStreamingChatMessage(
           temperature: 0.8,
           max_tokens: 300,
           stream: true
-        })
+        }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
-      if (!response.ok || !response.body) {
+      if (!response.ok) {
         let errText = '';
         try {
           const errJson = await response.json();
@@ -93,51 +156,12 @@ export async function sendStreamingChatMessage(
         throw new Error(`DeepSeek API error: ${errText}`);
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let fullText = '';
-      let buffer = '';
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed === 'data: [DONE]') continue;
-          if (trimmed.startsWith('data: ')) {
-            try {
-              const json = JSON.parse(trimmed.substring(6));
-              const content = json.choices?.[0]?.delta?.content || '';
-              if (content) {
-                fullText += content;
-                onToken(content, fullText);
-              }
-            } catch {
-              // Ignore partial JSON parse errors
-            }
-          }
-        }
-      }
-
-      if (buffer.trim().startsWith('data: ') && buffer.trim() !== 'data: [DONE]') {
-        try {
-          const json = JSON.parse(buffer.trim().substring(6));
-          const content = json.choices?.[0]?.delta?.content || '';
-          if (content) fullText += content;
-        } catch {
-          // Ignore
-        }
-      }
-
+      const fullText = await readSSEResponseStream(response, onToken);
       const { emotions, actions } = parseResponseText(fullText);
       onComplete(fullText, emotions, actions);
       return;
     } catch (err) {
+      clearTimeout(timeoutId);
       console.error("DeepSeek API streaming failed:", err);
       onError(err);
       simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete);
@@ -146,6 +170,9 @@ export async function sendStreamingChatMessage(
   }
 
   if (apiConfig.provider === 'lmstudio') {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     try {
       const response = await fetch(`${apiConfig.lmStudioUrl}/chat/completions`, {
         method: 'POST',
@@ -156,58 +183,21 @@ export async function sendStreamingChatMessage(
           temperature: 0.8,
           max_tokens: 250,
           stream: true
-        })
+        }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
-      if (!response.ok || !response.body) {
+      if (!response.ok) {
         throw new Error(`LM Studio returned status ${response.status}`);
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let fullText = '';
-      let buffer = '';
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed === 'data: [DONE]') continue;
-          if (trimmed.startsWith('data: ')) {
-            try {
-              const json = JSON.parse(trimmed.substring(6));
-              const content = json.choices?.[0]?.delta?.content || '';
-              if (content) {
-                fullText += content;
-                onToken(content, fullText);
-              }
-            } catch {
-              // Ignore partial JSON parse errors
-            }
-          }
-        }
-      }
-
-      if (buffer.trim().startsWith('data: ') && buffer.trim() !== 'data: [DONE]') {
-        try {
-          const json = JSON.parse(buffer.trim().substring(6));
-          const content = json.choices?.[0]?.delta?.content || '';
-          if (content) fullText += content;
-        } catch {
-          // Ignore
-        }
-      }
-
+      const fullText = await readSSEResponseStream(response, onToken);
       const { emotions, actions } = parseResponseText(fullText);
       onComplete(fullText, emotions, actions);
       return;
     } catch (err) {
+      clearTimeout(timeoutId);
       console.warn("LM Studio connection failed (server offline or port 1234 not listening). Falling back to dynamic roleplay engine:", err);
       onError(err);
       simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete);

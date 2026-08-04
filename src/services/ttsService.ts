@@ -249,6 +249,14 @@ class TTSService {
   public stop() {
     this.audioQueue = [];
     this.isProcessingQueue = false;
+    if (this.currentBufferSource) {
+      try {
+        this.currentBufferSource.stop();
+      } catch {
+        // ignore if already stopped
+      }
+      this.currentBufferSource = null;
+    }
     if (this.currentAudio) {
       this.currentAudio.pause();
       this.currentAudio = null;
@@ -273,7 +281,7 @@ class TTSService {
 
     // Insert expressive micro-pauses for natural intonation
     const expressiveText = text
-      .replace(/(\!|\?|\.|\,)/g, '$1 ')
+      .replace(/(!|\?|\.|,)/g, '$1 ')
       .replace(/\s+/g, ' ');
 
     // Detect Japanese characters vs English/Indonesian
@@ -335,8 +343,8 @@ class TTSService {
       processedText = processedText
         .replace(/\b[wW][-–—\s]+(?=待っ|なに|何|やめ|いいえ|お願い|ごめん|バカ|バーカ)/g, 'ま、')
         .replace(/\b([a-zA-Z])[-–—\s]+(?=[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff])/g, 'っ、')
-        .replace(/^えっと([…\.\s！]*)$/g, 'えーっとね、')
-        .replace(/^あの([…\.\s！]*)$/g, 'あのね、');
+        .replace(/^えっと([….\s！]*)$/g, 'えーっとね、')
+        .replace(/^あの([….\s！]*)$/g, 'あのね、');
       return processedText;
     }
 
@@ -346,9 +354,9 @@ class TTSService {
       .replace(/\bk[-–—\s]+kyaa?\b/gi, 'きゃ、きゃあぁー')
       .replace(/\bu[-–—\s]+uwaa?\b/gi, 'う、うわぁぁー')
       .replace(/\bf[-–—\s]+fuee?\b/gi, 'ふ、ふぇぇー')
-      .replace(/\bi[-–—\.\s]+i\b/gi, 'わ、私…')
-      .replace(/\by[-–—\.\s]+you\b/gi, 'あ、あんた')
-      .replace(/\bm[-–—\.\s]+me\b/gi, 'わ、私')
+      .replace(/\bi[-–—.\s]+i\b/gi, 'わ、私…')
+      .replace(/\by[-–—.\s]+you\b/gi, 'あ、あんた')
+      .replace(/\bm[-–—.\s]+me\b/gi, 'わ、私')
       .replace(/\bw[-–—\s]+wait\b/gi, 'ま、待って')
       .replace(/\bw[-–—\s]+what\b/gi, 'えっ、な、なに')
       .replace(/\bd[-–—\s]+don'?t\b/gi, 'や、やめて')
@@ -368,7 +376,7 @@ class TTSService {
     // 3. Normalize single-letter English stutters (e.g. "t- test" -> "test") so translation API doesn't get letter sound artifacts
     const cleanStutterText = processedText.replace(/\b([a-zA-Z])[-–—\s]+([a-zA-Z]{2,})\b/g, '$2');
 
-    const lower = cleanStutterText.toLowerCase().replace(/^[,\.\!\?\s]+|[,\.\!\?\s]+$/g, '');
+    const lower = cleanStutterText.toLowerCase().replace(/^[,.!?\s]+|[,.!?\s]+$/g, '');
 
     // Fast Anime Roleplay Phrase Dictionary for authentic intimate voice dubbing
     const animeDict: Record<string, string> = {

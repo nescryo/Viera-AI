@@ -95,6 +95,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     apiConfigRef.current = apiConfig;
   }, [apiConfig]);
 
+  const onSelectEmotionRef = useRef(onSelectEmotion);
+  useEffect(() => {
+    onSelectEmotionRef.current = onSelectEmotion;
+  }, [onSelectEmotion]);
+
   // Ref to hold loaded MMD mesh, bones, cheek blush materials, and morph target dictionary
   const mmdMeshRef = useRef<THREE.SkinnedMesh | null>(null);
   const upperBodyBoneRef = useRef<THREE.Bone | null>(null);
@@ -436,7 +441,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         // Strict Head Pat Zone ONLY (Top of Head & Hair: y >= 1.35 and relX < 0.28)
         if (relX < 0.28 && hitPoint.y >= 1.35) {
           currentEmotionRef.current = 'blush';
-          onSelectEmotion?.('blush');
+          onSelectEmotionRef.current?.('blush');
           headPatTiltTimer = 1.0;
           triggerSparkles(hitPoint);
 
@@ -455,7 +460,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         // Strict Chest Ribbon Zone ONLY (Center Ribbon: 1.08 <= y < 1.35 and relX < 0.18)
         else if (relX < 0.18 && hitPoint.y >= 1.08 && hitPoint.y < 1.35) {
           currentEmotionRef.current = 'surprised';
-          onSelectEmotion?.('surprised');
+          onSelectEmotionRef.current?.('surprised');
           triggerSparkles(hitPoint);
 
           ttsService.speak(
