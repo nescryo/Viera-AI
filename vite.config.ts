@@ -6,6 +6,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      '/fish_audio_api': {
+        target: 'https://api.fish.audio',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/fish_audio_api/, '')
+      },
       '/voicevox_api': {
         target: 'http://localhost:50021',
         changeOrigin: true,

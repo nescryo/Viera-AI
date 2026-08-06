@@ -163,8 +163,14 @@ class TTSService {
     };
 
     const ttsProvider = item.apiConfig?.ttsProvider || 'voicevox';
-    if (ttsProvider === 'voicevox') {
+    if (ttsProvider === 'fish-audio') {
+      await this.speakFishAudio(item.text, item.persona, item.apiConfig, item.onStart, onFinish);
+    } else if (ttsProvider === 'voicevox') {
       await this.speakVoicevox(item.text, item.persona, item.apiConfig, item.onStart, onFinish);
+    } else if (ttsProvider === 'style-bert-vits2') {
+      await this.speakStyleBertVits2(item.text, item.persona, item.apiConfig, item.onStart, onFinish);
+    } else if (ttsProvider === 'vits') {
+      await this.speakLocalVits(item.text, item.persona, item.apiConfig, item.onStart, onFinish);
     } else {
       this.speakEdgeNeural(item.text, item.persona, item.onStart, onFinish);
     }
@@ -204,7 +210,9 @@ class TTSService {
 
     const ttsProvider = apiConfig?.ttsProvider || 'voicevox';
 
-    if (ttsProvider === 'style-bert-vits2') {
+    if (ttsProvider === 'fish-audio') {
+      this.speakFishAudio(targetText, persona, apiConfig, onStart, onEnd);
+    } else if (ttsProvider === 'style-bert-vits2') {
       this.speakStyleBertVits2(targetText, persona, apiConfig, onStart, onEnd);
     } else if (ttsProvider === 'voicevox') {
       this.speakVoicevox(targetText, persona, apiConfig, onStart, onEnd);
@@ -856,6 +864,138 @@ class TTSService {
       await audio.play();
     } catch (err) {
       console.warn("Local VITS Server offline, falling back to Edge Neural Voice:", err);
+      this.speakEdgeNeural(text, persona, onStart, onEnd);
+    }
+  }
+
+  // Fish Audio S2.1 Pro TTS Integration (Zero-Shot Multilingual Voice Cloning)
+  private async speakFishAudio(
+    text: string,
+    persona: Persona,
+    apiConfig?: ApiConfig,
+    onStart?: () => void,
+    onEnd?: () => void
+  ) {
+    const apiKey = apiConfig?.fishAudioApiKey || apiConfig?.openRouterApiKey;
+    let refId = apiConfig?.fishAudioReferenceId || '';
+    const dummyIds = [
+      '7f92f8afb8ec43bf81429cc1c9199cb1',
+      'a31d904791884392945d8b8849b29141',
+      'd86289b43e624c9eb4ef6fb34c679234',
+      'b1424683f124403fa8572183c5e88411',
+      'custom'
+    ];
+    if (!refId.trim() || dummyIds.includes(refId.trim())) {
+      refId = '';
+    }
+
+    if (!apiKey) {
+      console.warn("[Viera TTS Warning] Fish Audio requires an API Key (Fish Audio API Key or OpenRouter API Key in Settings). Falling back to Edge Neural.");
+      this.speakEdgeNeural(text, persona, onStart, onEnd);
+      return;
+    }
+
+    try {
+      // Auto translate English text to Japanese for authentic anime dubbing if Japanese voice model is selected
+      const jaText = await this.translateToJapanese(text);
+
+      const emotion = this.detectEmotionFromText(text);
+      let synthText = jaText;
+      if (emotion === 'whisper') {
+        synthText = `[whisper] ${jaText}`;
+      } else if (emotion === 'tsundere' || emotion === 'teasing') {
+        synthText = `[excited] ${jaText}`;
+      }
+
+      // Check if accessing via OpenRouter or Direct Fish Audio API (via Vite proxy to bypass CORS)
+      const isOpenRouter = !apiConfig?.fishAudioApiKey && !!apiConfig?.openRouterApiKey;
+      const endpoint = isOpenRouter
+        ? 'https://openrouter.ai/api/v1/audio/speech'
+        : '/fish_audio_api/v1/tts';
+
+      const selectedModel = apiConfig?.fishAudioModel || 's2.1-pro-free';
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'model': selectedModel
+      };
+
+      const payload: Record<string, any> = isOpenRouter
+        ? {
+            model: selectedModel.startsWith('fish-audio/') ? selectedModel : `fish-audio/${selectedModel}`,
+            input: synthText,
+            voice: refId || undefined
+          }
+        : {
+            text: synthText,
+            format: 'mp3',
+            latency: 'normal',
+            normalize: true,
+            model: selectedModel
+          };
+
+      if (!isOpenRouter && refId) {
+        payload.reference_id = refId;
+      }
+
+      console.log(`[Viera TTS Log] Sending Fish Audio request to ${endpoint} (Model: ${selectedModel}, Voice Ref: ${refId || 'default'})...`);
+
+      let response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      // Retry 1: If 400 Bad Request (Reference not found), retry without reference_id using default system voice!
+      if (!response.ok && response.status === 400) {
+        console.warn("[Viera TTS Warning] Reference ID not found on Fish Audio. Retrying with Fish Audio default system voice...");
+        delete payload.reference_id;
+        delete payload.voice;
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        });
+      }
+
+      // Retry 2: If direct Fish Audio API returns 402 (Insufficient API Credit) and OpenRouter key is available, retry via OpenRouter!
+      if (!response.ok && response.status === 402 && apiConfig?.openRouterApiKey && !isOpenRouter) {
+        console.warn("[Viera TTS Warning] Fish Audio direct API returned 402 Insufficient API credit. Retrying via OpenRouter Gateway...");
+        const openRouterEndpoint = 'https://openrouter.ai/api/v1/audio/speech';
+        const openRouterHeaders = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiConfig.openRouterApiKey}`
+        };
+        const openRouterPayload = {
+          model: selectedModel.startsWith('fish-audio/') ? selectedModel : `fish-audio/${selectedModel}`,
+          input: synthText
+        };
+
+        response = await fetch(openRouterEndpoint, {
+          method: 'POST',
+          headers: openRouterHeaders,
+          body: JSON.stringify(openRouterPayload)
+        });
+      }
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        console.error(`[Viera TTS Error] Fish Audio returned status ${response.status}:`, errText);
+        throw new Error(`Fish Audio API returned status ${response.status}: ${errText}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+
+      // Play via Web Audio API Acoustic Polish & Lip Sync Analyser
+      await this.playProcessedArrayBuffer(
+        arrayBuffer,
+        onStart,
+        onEnd,
+        () => this.speakEdgeNeural(text, persona, onStart, onEnd)
+      );
+    } catch (err) {
+      console.warn("[Viera TTS Warning] Fish Audio fetch failed, falling back to Edge Neural Voice:", err);
       this.speakEdgeNeural(text, persona, onStart, onEnd);
     }
   }
