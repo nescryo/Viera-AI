@@ -7,7 +7,7 @@ Runs on http://localhost:5000/tts with zero external pip dependencies using Pyth
 import sys
 import os
 import urllib.parse
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import subprocess
 import tempfile
 
@@ -21,19 +21,19 @@ class VitsHandler(BaseHTTPRequestHandler):
 
             print(f"[Local VITS Server] Generating Japanese/Anime Voice for {character}: {text}")
 
-            # Generate audio using system speech or edge-tts CLI
             with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as tmp_file:
                 tmp_path = tmp_file.name
 
             try:
-                # Use edge-tts python module or CLI if available, or espeak/gtts fallback
-                cmd = ["edge-tts", "--voice", "ja-JP-NanamiNeural", "--text", text, "--write-media", tmp_path]
-                res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                
-                if res.returncode != 0:
-                    # Fallback to English voice if Japanese neural voice CLI fails
-                    cmd = ["edge-tts", "--voice", "en-US-AnaNeural", "--text", text, "--write-media", tmp_path]
-                    subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                try:
+                    cmd = ["edge-tts", "--voice", "ja-JP-NanamiNeural", "--text", text, "--write-media", tmp_path]
+                    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    
+                    if res.returncode != 0:
+                        cmd = ["edge-tts", "--voice", "en-US-AnaNeural", "--text", text, "--write-media", tmp_path]
+                        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                except FileNotFoundError:
+                    print("[Local VITS Server Warning] edge-tts binary not found in PATH.")
 
                 if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
                     with open(tmp_path, 'rb') as f:
@@ -46,7 +46,7 @@ class VitsHandler(BaseHTTPRequestHandler):
                     self.end_headers()
                     self.wfile.write(audio_data)
                 else:
-                    self.send_error(500, "Failed to generate audio")
+                    self.send_error(500, "Failed to generate audio: edge-tts CLI missing or execution failed")
             finally:
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
@@ -65,9 +65,9 @@ class VitsHandler(BaseHTTPRequestHandler):
 
 def run_server():
     server_address = ('localhost', 5000)
-    httpd = HTTPServer(server_address, VitsHandler)
+    httpd = ThreadingHTTPServer(server_address, VitsHandler)
     print("=====================================================")
-    print("🚀 Viera Local VITS Anime Voice Server Running!")
+    print("🚀 Viera Local VITS Anime Voice Server Running (Threaded)!")
     print("📍 URL: http://localhost:5000/tts")
     print("=====================================================")
     try:

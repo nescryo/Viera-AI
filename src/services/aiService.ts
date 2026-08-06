@@ -102,7 +102,7 @@ export async function sendStreamingChatMessage(
   apiConfig: ApiConfig,
   onToken: (token: string, fullTextSoFar: string) => void,
   onComplete: (fullText: string, emotions: string[], actions: string[]) => void,
-  onError: (err: any) => void
+  _onError: (err: any) => void
 ): Promise<void> {
   const formattedHistory = messages.map(m => ({
     role: m.sender === 'user' ? 'user' : 'assistant',
@@ -117,9 +117,7 @@ export async function sendStreamingChatMessage(
   if (apiConfig.provider === 'deepseek') {
     const apiKey = apiConfig.deepseekApiKey || import.meta.env.VITE_DEEPSEEK_API_KEY || '';
     if (!apiKey) {
-      const errMsg = "DeepSeek API Key belum diisi! Silakan masukkan di Settings atau simpan di file .env (VITE_DEEPSEEK_API_KEY).";
-      console.error(errMsg);
-      onError(new Error(errMsg));
+      console.warn("DeepSeek API Key missing. Falling back to dynamic roleplay engine...");
       simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete);
       return;
     }
@@ -162,8 +160,7 @@ export async function sendStreamingChatMessage(
       return;
     } catch (err) {
       clearTimeout(timeoutId);
-      console.error("DeepSeek API streaming failed:", err);
-      onError(err);
+      console.warn("DeepSeek API streaming failed. Falling back to dynamic roleplay engine:", err);
       simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete);
       return;
     }
@@ -199,7 +196,6 @@ export async function sendStreamingChatMessage(
     } catch (err) {
       clearTimeout(timeoutId);
       console.warn("LM Studio connection failed (server offline or port 1234 not listening). Falling back to dynamic roleplay engine:", err);
-      onError(err);
       simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete);
       return;
     }

@@ -63,14 +63,16 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: 3D Model Loader & Settings */}
       <div className="header-right">
-        <div className={`provider-pill ${isLmStudioOnline ? 'online' : 'offline'}`}>
-          <span className={`provider-dot ${isLmStudioOnline ? 'dot-online' : 'dot-offline'}`} />
+        <div className={`provider-pill ${apiConfig.provider === 'deepseek' ? 'online' : isLmStudioOnline ? 'online' : 'offline'}`}>
+          <span className={`provider-dot ${apiConfig.provider === 'deepseek' ? 'dot-online' : isLmStudioOnline ? 'dot-online' : 'dot-offline'}`} />
           <span className="provider-name">
-            {apiConfig.provider === 'lmstudio'
+            {apiConfig.provider === 'deepseek'
+              ? 'DeepSeek AI (Cloud)'
+              : apiConfig.provider === 'lmstudio'
               ? isLmStudioOnline
                 ? 'LM Studio (Connected :1234)'
                 : 'LM Studio (Offline • Mock Mode)'
-              : 'Mock Engine'}
+              : 'Demo RP Engine'}
           </span>
         </div>
 

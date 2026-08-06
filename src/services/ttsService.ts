@@ -254,11 +254,22 @@ class TTSService {
     return result;
   }
 
+  private setJaCache(key: string, value: string) {
+    if (this.originalJaTextCache.size > 200) {
+      const firstKey = this.originalJaTextCache.keys().next().value;
+      if (firstKey !== undefined) {
+        this.originalJaTextCache.delete(firstKey);
+      }
+    }
+    this.originalJaTextCache.set(key, value);
+  }
+
   public stop() {
     this.audioQueue = [];
     this.isProcessingQueue = false;
     if (this.currentBufferSource) {
       try {
+        this.currentBufferSource.onended = null;
         this.currentBufferSource.stop();
       } catch {
         // ignore if already stopped
@@ -266,6 +277,9 @@ class TTSService {
       this.currentBufferSource = null;
     }
     if (this.currentAudio) {
+      this.currentAudio.onplay = null;
+      this.currentAudio.onended = null;
+      this.currentAudio.onerror = null;
       this.currentAudio.pause();
       this.currentAudio = null;
     }
@@ -480,7 +494,12 @@ class TTSService {
     }
 
     try {
-      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(cleanStutterText)}&langpair=en|ja`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(cleanStutterText)}&langpair=en|ja`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
       const data = await res.json();
       if (data && data.responseData && data.responseData.translatedText) {
         const jaRes = data.responseData.translatedText;
@@ -489,7 +508,7 @@ class TTSService {
         }
       }
     } catch (e) {
-      console.warn("Auto EN->JA translation failed, using raw text:", e);
+      console.warn("Auto EN->JA translation failed or timed out, using raw text:", e);
     }
     return cleanStutterText;
   }
@@ -500,7 +519,12 @@ class TTSService {
     }
     try {
       const cleanJa = text.replace(/\[.*?\]/g, '').replace(/\*.*?\*/g, '').trim();
-      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(cleanJa)}&langpair=ja|en`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(cleanJa)}&langpair=ja|en`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
       const data = await res.json();
       if (data && data.responseData && data.responseData.translatedText) {
         const rawText = data.responseData.translatedText;
@@ -512,16 +536,16 @@ class TTSService {
         
         // Cache the English translation back to the original Japanese text!
         if (enResult && !enResult.includes('MYMEMORY WARNING')) {
-          this.originalJaTextCache.set(enResult.trim().toLowerCase(), text);
+          this.setJaCache(enResult.trim().toLowerCase(), text);
           const cleanEn = enResult.replace(/\[.*?\]/g, '').replace(/\*.*?\*/g, '').trim().toLowerCase();
           if (cleanEn) {
-            this.originalJaTextCache.set(cleanEn, text);
+            this.setJaCache(cleanEn, text);
           }
           return enResult;
         }
       }
     } catch (e) {
-      console.warn("Auto JA->EN subtitle translation failed:", e);
+      console.warn("Auto JA->EN subtitle translation failed or timed out:", e);
     }
     return text;
   }
@@ -650,7 +674,6 @@ class TTSService {
       const speakers = await this.fetchVoicevoxSpeakers();
       const activeSpeakerId = this.resolveEmotionSpeakerStyle(baseSpeakerId, emotion, speakers);
 
-      // Step 1: Create Audio Query with active emotion style ID
       const queryRes = await fetch(`${voicevoxHost}/audio_query?text=${encodeURIComponent(formattedJaText)}&speaker=${activeSpeakerId}`, {
         method: 'POST'
       });
@@ -702,7 +725,7 @@ class TTSService {
       if (isShortInterjection || hasHesitation) {
         // Ensure browser audio buffer has enough time to initialize & finish playback without clipping short sounds
         queryJson.prePhonemeLength = Math.max(queryJson.prePhonemeLength ?? 0.1, 0.25);
-        queryJson.postPhonemeLength = Math.max(queryJson.postPhonemeLength ?? 0.1, 0.40);
+        queryJson.postPhonemeLength = Math.max(queryJson.postPhonemeLength ?? 0.40, 0.40);
         queryJson.speedScale = 0.88; // Relaxed speed for cute, resonant anime hesitation
         queryJson.volumeScale = (queryJson.volumeScale ?? 1.0) * 1.18; // Boost volume so short sounds are crisp and clear
       } else {
@@ -747,7 +770,6 @@ class TTSService {
       queryJson.speedScale = Math.min(queryJson.speedScale ?? 0.92, 0.95);
       queryJson.intonationScale = Math.min(queryJson.intonationScale ?? 1.15, 1.20);
 
-      // Step 2: Synthesize Audio Wave
       const synthRes = await fetch(`${voicevoxHost}/synthesis?speaker=${activeSpeakerId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -760,7 +782,6 @@ class TTSService {
 
       const arrayBuffer = await synthRes.arrayBuffer();
 
-      // Step 3: Play processed audio via RAM AudioBufferSourceNode with Web Audio API Acoustic Polish (Warm EQ + Studio Reverb)
       await this.playProcessedArrayBuffer(
         arrayBuffer,
         onStart,
