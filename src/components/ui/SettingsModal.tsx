@@ -63,6 +63,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [vitsServerUrl, setVitsServerUrl] = useState(apiConfig.vitsServerUrl || 'http://localhost:5000/tts');
 
   const [voicevoxSpeakerId, setVoicevoxSpeakerId] = useState<number>(apiConfig.voicevoxSpeakerId ?? 0);
+  const [fishAudioApiKey, setFishAudioApiKey] = useState(apiConfig.fishAudioApiKey || '');
+  const [fishAudioReferenceId, setFishAudioReferenceId] = useState(apiConfig.fishAudioReferenceId || '7f92f8afb8ec43bf81429cc1c9199cb1');
+  const [fishAudioModel, setFishAudioModel] = useState(apiConfig.fishAudioModel || 's2.1-pro-free');
   const [speakers, setSpeakers] = useState<VoicevoxSpeaker[]>([]);
 
   useEffect(() => {
@@ -89,7 +92,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       deepseekModel,
       ttsProvider,
       vitsServerUrl,
-      voicevoxSpeakerId
+      voicevoxSpeakerId,
+      fishAudioApiKey,
+      fishAudioReferenceId,
+      fishAudioModel
     });
     onClose();
   };
@@ -215,6 +221,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="provider-selector-grid">
               <button
                 type="button"
+                className={`provider-card ${ttsProvider === 'fish-audio' ? 'active' : ''}`}
+                onClick={() => setTtsProvider('fish-audio')}
+              >
+                <Sparkles size={24} />
+                <div className="provider-card-info">
+                  <span className="p-title">Fish Audio S2.1 Pro</span>
+                  <span className="p-desc">Zero-Shot Voice Cloning • Free / API</span>
+                </div>
+                {ttsProvider === 'fish-audio' && <CheckCircle size={18} className="p-check" />}
+              </button>
+
+              <button
+                type="button"
                 className={`provider-card ${ttsProvider === 'voicevox' ? 'active' : ''}`}
                 onClick={() => setTtsProvider('voicevox')}
               >
@@ -253,6 +272,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
             </div>
           </div>
+
+          {ttsProvider === 'fish-audio' && (
+            <div className="provider-details-box fade-in">
+              <div className="form-group">
+                <label className="form-label">Fish Audio Model Version</label>
+                <select
+                  value={fishAudioModel}
+                  onChange={(e) => setFishAudioModel(e.target.value)}
+                  className="form-input"
+                >
+                  <option value="s2.1-pro-free">s2.1-pro-free (Official Free Developer API Tier)</option>
+                  <option value="s2.1-pro">s2.1-pro (Paid / Standard Production Tier)</option>
+                  <option value="fish-audio/s2.1-pro-free">fish-audio/s2.1-pro-free (OpenRouter Gateway)</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{ marginTop: '0.8rem' }}>
+                <label className="form-label">Voice Model Preset</label>
+                <select
+                  value={fishAudioReferenceId}
+                  onChange={(e) => setFishAudioReferenceId(e.target.value)}
+                  className="form-input"
+                >
+                  <option value="">Default System Voice (Fish Audio Built-in)</option>
+                  <option value="0d4d2a579d6146debf509b79eb83e7de">Firefly / ホタル (Honkai: Star Rail JP Dub)</option>
+                  <option value="custom">Custom Reference ID (Manual Input)</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{ marginTop: '0.8rem' }}>
+                <label className="form-label">Voice Reference ID</label>
+                <input
+                  type="text"
+                  value={fishAudioReferenceId}
+                  onChange={(e) => setFishAudioReferenceId(e.target.value)}
+                  placeholder="Paste Reference ID from fish.audio catalog"
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-group" style={{ marginTop: '0.8rem' }}>
+                <label className="form-label">Fish Audio API Key (Optional for OpenRouter Fallback)</label>
+                <input
+                  type="password"
+                  value={fishAudioApiKey}
+                  onChange={(e) => setFishAudioApiKey(e.target.value)}
+                  placeholder="Optional: Enter Fish Audio API Key (Uses OpenRouter key if blank)"
+                  className="form-input"
+                />
+              </div>
+            </div>
+          )}
 
           {ttsProvider === 'voicevox' && (
             <div className="provider-details-box fade-in">

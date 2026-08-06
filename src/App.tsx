@@ -25,10 +25,13 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showUploader, setShowUploader] = useState(false);
 
-  // API Configuration (Auto-detects DeepSeek from .env or localStorage)
+  // API Configuration (Auto-detects keys from .env or localStorage)
   const [apiConfig, setApiConfig] = useState<ApiConfig>(() => {
     const saved = localStorage.getItem('viera_api_config');
-    const envKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+    const envDeepseekKey = import.meta.env.VITE_DEEPSEEK_API_KEY || '';
+    const envOpenRouterKey = import.meta.env.VITE_OPENROUTER_API_KEY || '';
+    const envFishAudioKey = import.meta.env.VITE_FISH_AUDIO_API_KEY || '';
+
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -36,7 +39,9 @@ export function App() {
           ...parsed,
           provider: parsed.provider || 'deepseek',
           deepseekModel: parsed.deepseekModel || 'deepseek-chat',
-          deepseekApiKey: parsed.deepseekApiKey || envKey || ''
+          deepseekApiKey: parsed.deepseekApiKey || envDeepseekKey,
+          openRouterApiKey: parsed.openRouterApiKey || envOpenRouterKey,
+          fishAudioApiKey: parsed.fishAudioApiKey || envFishAudioKey
         };
       } catch (e) {
         console.warn("Failed to parse saved apiConfig:", e);
@@ -46,13 +51,15 @@ export function App() {
       provider: 'deepseek',
       lmStudioUrl: 'http://localhost:1234/v1',
       lmStudioModel: 'local-model',
-      deepseekApiKey: envKey || '',
+      deepseekApiKey: envDeepseekKey,
       deepseekModel: 'deepseek-chat',
       geminiApiKey: '',
-      openRouterApiKey: '',
+      openRouterApiKey: envOpenRouterKey,
       openRouterModel: '',
       ttsProvider: 'voicevox',
-      voicevoxSpeakerId: 0
+      voicevoxSpeakerId: 0,
+      fishAudioApiKey: envFishAudioKey,
+      fishAudioReferenceId: ''
     };
   });
 
