@@ -111,7 +111,7 @@ export async function sendStreamingChatMessage(
 
   const systemMessage = {
     role: 'system',
-    content: `${persona.systemPrompt}\n\nMaintain character at all times. Use asterisks for actions like *smiles* or *gestures*, and use emotion tags like [happy], [blush], [relaxed], [surprised], [angry], [sad], or [neutral] when appropriate.`
+    content: `${persona.systemPrompt}\n\nMaintain character at all times. Use asterisks for actions like *smiles* or *gestures*, and use emotion tags like [happy], [blush], [blush-hardly], [teasing], [jealous], [terrified], [pouting], [relaxed], [surprised], [angry], or [sad] when appropriate.`
   };
 
   if (apiConfig.provider === 'deepseek') {
@@ -238,6 +238,36 @@ function simulateFallbackStreaming(
 export function generateMockRoleplayResponse(lastUserText: string): string {
   const lower = lastUserText.toLowerCase().trim();
 
+  // Extreme Blush / Love Confession -> [blush-hardly]
+  if (lower.includes('aku cinta kamu') || lower.includes('i love you') || lower.includes('cinta kamu') || lower.includes('nikah') || lower.includes('marry me')) {
+    return "*face turns bright crimson up to her ears, covering her blushing face with trembling hands* [blush-hardly] W-WHAT?! C-Cinta?! T-Trailblazer... how could you say something so incredibly embarrassing with a straight face?! My heart is beating so fast it feels like it's going to explode...!";
+  }
+
+  // Jealousy -> [jealous]
+  if (lower.includes('cewek lain') || lower.includes('wanita lain') || lower.includes('other girl') || lower.includes('march 7th') || lower.includes('kafka') || lower.includes('sparkle')) {
+    return "*pouts deeply with narrowed jealous eyes, turning her head away* [jealous] Hmph! Why are you bringing up other girls in front of me, Trailblazer? Are they more important to you than me...? I'm not talking to you right now!";
+  }
+
+  // Terrified -> [terrified]
+  if (lower.includes('hantu') || lower.includes('takut') || lower.includes('ghost') || lower.includes('scary') || lower.includes('monster') || lower.includes('seram')) {
+    return "*hugs herself tightly trembling with terrified wide eyes* [terrified] E-Eeeek! P-Please don't scare me like that, Trailblazer! Is there really something spooky behind us?! Protect me, please...!";
+  }
+
+  // Teasing -> [teasing]
+  if (lower.includes('goda') || lower.includes('tease') || lower.includes('jahil') || lower.includes('lucu') || lower.includes('playful')) {
+    return "*smirks playfully with a mischievous wink* [teasing] Ehe~ Are you trying to tease me, Trailblazer? Or maybe... you just can't take your eyes off me? Who's teasing who now~?";
+  }
+
+  // Pouting -> [pouting]
+  if (lower.includes('cemberut') || lower.includes('pout') || lower.includes('sulking') || lower.includes('ngambek')) {
+    return "*puffs her cheeks out in an adorable pout* [pouting] I'm not ngambek! I'm just... slightly unamused by your behavior right now! You better buy me a sweet cake to make up for it!";
+  }
+
+  // Smug / Teasing
+  if (lower.includes('hebat') || lower.includes('pintar') || lower.includes('smart') || lower.includes('pro') || lower.includes('menang')) {
+    return "*tilts her chin up playfully with a mischievous smirk* [teasing] Hehe~ Of course! Did you really doubt me, Trailblazer? You should praise me more~!";
+  }
+
   // Short questions like "kenapa", "what", "why"
   if (lower === 'kenapa' || lower === 'why' || lower === 'what' || lower === 'apa') {
     return "*menatapmu bingung dengan mata membulat* [surprised] Eh? Kenapa? Ada apa Trailblazer? Apa ada sesuatu yang menganggumu? Ceritakan padaku!";
@@ -252,7 +282,7 @@ export function generateMockRoleplayResponse(lastUserText: string): string {
     return "*smiles warmly with gentle eyes, waving slightly* [happy] Good morning, Trailblazer! I'm so happy to see you today. Have you had anything sweet to eat yet? Let's spend another wonderful day together!";
   }
 
-  // Compliments
+  // Compliments -> standard blush
   if (lower.includes('cantik') || lower.includes('imut') || lower.includes('suka') || lower.includes('love') || lower.includes('cute')) {
     return "*cheeks blush soft rose and looks down timidly* [blush] E-Ehh?! Why are you saying that so suddenly... You make my heart flutter so fast, Trailblazer...";
   }

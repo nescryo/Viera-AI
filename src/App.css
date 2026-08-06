@@ -26,54 +26,86 @@
 
 .scene-status-overlay {
   position: absolute;
-  bottom: 24px;
+  top: 80px;
   left: 24px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 10px;
+  gap: 8px;
   z-index: 5;
   pointer-events: auto;
 }
 
 .testing-emotions-bar {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(30, 31, 34, 0.75);
-  backdrop-filter: blur(12px);
+  flex-direction: column;
+  background: rgba(22, 23, 26, 0.85);
+  backdrop-filter: blur(16px);
   border: 1px solid var(--border-subtle);
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
+  padding: 10px;
+  border-radius: var(--radius-md);
+  width: 145px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .testing-label {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
-  font-weight: 500;
-  margin-right: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+  padding-left: 2px;
+}
+
+.testing-emotions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: calc(100vh - 230px);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.testing-emotions-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.testing-emotions-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+.testing-emotions-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
 }
 
 .emotion-test-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   color: var(--text-muted);
-  font-size: 0.75rem;
-  padding: 4px 8px;
+  font-size: 0.78rem;
+  padding: 5px 10px;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  text-align: left;
+  transition: all 0.18s ease;
+  white-space: nowrap;
 }
 
 .emotion-test-btn:hover {
   background: rgba(255, 255, 255, 0.12);
   color: var(--text-normal);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateX(2px);
 }
 
 .emotion-test-btn.active {
   background: var(--accent-blurple);
   color: #fff;
   font-weight: 600;
+  border-color: transparent;
   box-shadow: 0 0 10px rgba(88, 101, 242, 0.4);
 }
 
