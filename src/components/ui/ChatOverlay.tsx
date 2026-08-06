@@ -136,6 +136,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
   const [inputText, setInputText] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const latestMessageText = messages[messages.length - 1]?.text || '';
@@ -155,6 +156,59 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const toggleRecording = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Browser Anda belum mendukung Speech Recognition. Gunakan Google Chrome atau Edge.");
+      return;
+    }
+
+    if (isRecording) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsRecording(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'id-ID';
+
+      recognition.onstart = () => {
+        setIsRecording(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        if (transcript) {
+          setInputText(transcript);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn("Speech recognition error:", event.error);
+        setIsRecording(false);
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error("Failed to start speech recognition:", err);
+      setIsRecording(false);
+    }
   };
 
   return (
@@ -231,8 +285,8 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
         <button 
           type="button" 
           className={`mic-btn ${isRecording ? 'recording' : ''}`}
-          onClick={() => setIsRecording(!isRecording)}
-          title="Voice Speech Input"
+          onClick={toggleRecording}
+          title={isRecording ? "Listening... Click to stop" : "Voice Speech Input"}
         >
           {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
         </button>

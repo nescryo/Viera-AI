@@ -1002,11 +1002,13 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           const mesh = object as THREE.Mesh;
           if (mesh.geometry) mesh.geometry.dispose();
           if (mesh.material) {
-            if (Array.isArray(mesh.material)) {
-              mesh.material.forEach((mat) => mat.dispose());
-            } else {
-              mesh.material.dispose();
-            }
+            const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            materials.forEach((mat) => {
+              if ('map' in mat && (mat as any).map) {
+                (mat as any).map.dispose();
+              }
+              mat.dispose();
+            });
           }
         }
       });

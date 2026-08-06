@@ -207,11 +207,119 @@ export function App() {
   };
 
   const handleRegenerateResponse = () => {
-    if (messages.length === 0) return;
-    const lastUserMsg = [...messages].reverse().find(m => m.sender === 'user');
-    if (lastUserMsg) {
-      handleSendMessage(lastUserMsg.text);
+    if (messages.length === 0 || isLoading) return;
+    
+    // Find index of the last user message
+    let lastUserIndex = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].sender === 'user') {
+        lastUserIndex = i;
+        break;
+      }
     }
+
+    if (lastUserIndex === -1) return;
+
+    // Prune everything after the last user message
+    const trimmedHistory = messages.slice(0, lastUserIndex + 1);
+    setMessages(trimmedHistory);
+    setIsLoading(true);
+
+    const aiMsgId = (Date.now() + 1).toString();
+    const placeholderAiMsg: ChatMessage = {
+      id: aiMsgId,
+      sender: 'ai',
+      characterId: currentPersona.id,
+      text: '',
+      emotions: [],
+      actions: [],
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setMessages([...trimmedHistory, placeholderAiMsg]);
+
+    let updateFrameId: number | null = null;
+    let latestText = '';
+
+    sendStreamingChatMessage(
+      trimmedHistory,
+      currentPersona,
+      apiConfig,
+      (_token, fullTextSoFar) => {
+        latestText = fullTextSoFar;
+        const { emotions } = parseResponseText(fullTextSoFar);
+        
+        if (emotions.length > 0) {
+          const activeEmotion = emotions[emotions.length - 1];
+          setCurrentEmotion(activeEmotion);
+        }
+
+        if (!updateFrameId) {
+          updateFrameId = requestAnimationFrame(() => {
+            updateFrameId = null;
+            const { emotions: currEmotions, actions: currActions } = parseResponseText(latestText);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMsgId
+                  ? { ...msg, text: latestText, emotions: currEmotions, actions: currActions }
+                  : msg
+              )
+            );
+          });
+        }
+      },
+      (fullText, emotions, actions) => {
+        if (updateFrameId) {
+          cancelAnimationFrame(updateFrameId);
+          updateFrameId = null;
+        }
+        setIsLoading(false);
+        const activeEmotion = emotions[0] || 'happy';
+        setCurrentEmotion(activeEmotion);
+
+        const finalMsg: ChatMessage = {
+          id: aiMsgId,
+          sender: 'ai',
+          characterId: currentPersona.id,
+          text: fullText,
+          originalText: fullText,
+          emotions,
+          actions,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        setMessages((prev) =>
+          prev.map((msg) => (msg.id === aiMsgId ? finalMsg : msg))
+        );
+
+        speakMessage(finalMsg);
+
+        if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(fullText)) {
+          ttsService.translateJapaneseToEnglish(fullText).then((enSub) => {
+            if (enSub && enSub !== fullText) {
+              const { emotions: currEmotions, actions: currActions } = parseResponseText(fullText);
+              const emotionPrefix = currEmotions.length > 0 ? `[${currEmotions[0]}] ` : '';
+              const actionPrefix = currActions.length > 0 ? `*${currActions[0]}* ` : '';
+              const englishOnlyText = `${emotionPrefix}${actionPrefix}${enSub}`;
+
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === aiMsgId ? { ...msg, text: englishOnlyText, originalText: fullText } : msg
+                )
+              );
+            }
+          });
+        }
+      },
+      (err) => {
+        if (updateFrameId) {
+          cancelAnimationFrame(updateFrameId);
+          updateFrameId = null;
+        }
+        console.error("Streaming error:", err);
+        setIsLoading(false);
+      }
+    );
   };
 
   const handleSelectEmotion = useCallback((emotion: string) => {
