@@ -18,13 +18,17 @@ interface SceneProps {
 }
 
 const TESTING_EMOTIONS = [
-  { id: 'happy', label: '😊 Happy' },
-  { id: 'blush', label: '😳 Blush' },
-  { id: 'relaxed', label: '😌 Relaxed' },
-  { id: 'surprised', label: '😮 Surprised' },
-  { id: 'angry', label: '😠 Angry' },
-  { id: 'sad', label: '😢 Sad' },
-  { id: 'neutral', label: '😐 Neutral' }
+  { id: 'happy', label: 'Happy' },
+  { id: 'blush', label: 'Blush' },
+  { id: 'blush-hardly', label: 'Blush Hardly' },
+  { id: 'teasing', label: 'Teasing' },
+  { id: 'jealous', label: 'Jealous' },
+  { id: 'terrified', label: 'Terrified' },
+  { id: 'pouting', label: 'Pouting' },
+  { id: 'relaxed', label: 'Relaxed' },
+  { id: 'surprised', label: 'Surprised' },
+  { id: 'angry', label: 'Angry' },
+  { id: 'sad', label: 'Sad' }
 ];
 
 /**
@@ -58,6 +62,54 @@ function createSoftPorcelainCheekTexture(): THREE.CanvasTexture {
       ctx.beginPath();
       ctx.moveTo(x, 128 - heightOffset);
       ctx.lineTo(x, 128 + heightOffset);
+      ctx.stroke();
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+
+
+
+
+/**
+ * Creates an Authentic Anime Forehead Horror/Shock Dark Shadow Texture
+ */
+function createAnimeForeheadShadowTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  if (ctx) {
+    ctx.clearRect(0, 0, 256, 256);
+
+    // Full Width Dark linear gradient fading out near nose bridge
+    const gradient = ctx.createLinearGradient(0, 0, 0, 220);
+    gradient.addColorStop(0, 'rgba(6, 8, 22, 0.98)');
+    gradient.addColorStop(0.45, 'rgba(12, 15, 38, 0.82)');
+    gradient.addColorStop(0.80, 'rgba(20, 24, 52, 0.25)');
+    gradient.addColorStop(1, 'rgba(20, 24, 52, 0)');
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 256, 220);
+
+    // Full Width Classic Anime Vertical Shock/Horror Hatching Lines
+    for (let x = 5; x <= 251; x += 8) {
+      const lineLen = 160 + Math.sin(x * 0.15) * 25;
+      const lineGrad = ctx.createLinearGradient(x, 0, x, lineLen);
+      lineGrad.addColorStop(0, 'rgba(4, 5, 16, 0.92)');
+      lineGrad.addColorStop(0.75, 'rgba(4, 5, 16, 0.30)');
+      lineGrad.addColorStop(1, 'rgba(4, 5, 16, 0)');
+
+      ctx.strokeStyle = lineGrad;
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x + Math.sin(x * 0.05) * 3, lineLen);
       ctx.stroke();
     }
   }
@@ -109,6 +161,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
   const hairBonesRef = useRef<{ bone: THREE.Bone; baseRotZ: number; baseRotX: number; phase: number }[]>([]);
   const skirtBonesRef = useRef<{ bone: THREE.Bone; baseRotZ: number; baseRotX: number; phase: number }[]>([]);
   const cheekMaterialsRef = useRef<THREE.MeshBasicMaterial[]>([]);
+  const foreheadShadowMaterialRef = useRef<THREE.MeshBasicMaterial | null>(null);
 
   const blinkTimerRef = useRef<{ nextBlinkTime: number; isBlinking: boolean; blinkProgress: number }>({
     nextBlinkTime: 0,
@@ -295,6 +348,24 @@ export const Scene: React.FC<SceneProps> = React.memo(({
               if ('roughness' in mat) {
                 (mat as any).roughness = 0.8;
               }
+
+              // Detect Blender Exported Forehead Shadow Material
+              const matName = (mat.name || '').toLowerCase();
+              if (matName.includes('forehead_shadow') || matName.includes('forehead') || matName.includes('dahi')) {
+                foreheadShadowMaterialRef.current = mat as THREE.MeshBasicMaterial;
+                mat.transparent = true;
+                mat.side = THREE.DoubleSide;
+                mat.depthWrite = false;
+                (mat as any).opacity = 0;
+                if ('map' in mat) {
+                  (mat as any).map = createAnimeForeheadShadowTexture();
+                }
+                // Attach separate plane mesh directly to headBone so it follows head rotation 100%
+                if (headBone && mesh !== mmdMesh) {
+                  (headBone as THREE.Bone).add(mesh);
+                }
+              }
+
               mat.needsUpdate = true;
               return mat;
             };
@@ -306,6 +377,76 @@ export const Scene: React.FC<SceneProps> = React.memo(({
             }
           }
         });
+
+        // Fallback: If no Blender exported forehead shadow material was detected, automatically create one on headBone!
+        if (!foreheadShadowMaterialRef.current) {
+          const animeForeheadTex = createAnimeForeheadShadowTexture();
+          const mat = new THREE.MeshBasicMaterial({
+            map: animeForeheadTex,
+            transparent: true,
+            opacity: 0,
+            depthTest: false,
+            depthWrite: false,
+            side: THREE.DoubleSide
+          });
+          foreheadShadowMaterialRef.current = mat;
+
+          // Scaled & positioned cleanly on forehead area above eyes
+          const geo = new THREE.PlaneGeometry(0.55, 0.35);
+          const foreheadMesh = new THREE.Mesh(geo, mat);
+          foreheadMesh.position.set(0, 0.38, 0.28);
+          foreheadMesh.rotation.x = -0.06;
+
+          if (headBone) {
+            (headBone as THREE.Bone).add(foreheadMesh);
+          } else {
+            foreheadMesh.position.set(-0.65, 1.45, 0.15);
+            modelGroup.add(foreheadMesh);
+          }
+        }
+
+        // Bind Blender Exported mat_forehead_shadow vertices to headBone in SkinnedMesh
+        if (mmdMesh.skeleton && mmdMesh.skeleton.bones && Array.isArray(mmdMesh.material)) {
+          let headBoneIdx = -1;
+          mmdMesh.skeleton.bones.forEach((b, idx) => {
+            if (b.name === '頭' || b.name === 'head') headBoneIdx = idx;
+          });
+
+          const foreheadMatIdx = mmdMesh.material.findIndex((m) =>
+            (m.name || '').toLowerCase().includes('forehead')
+          );
+
+          if (foreheadMatIdx !== -1 && headBoneIdx !== -1 && mmdMesh.geometry.groups) {
+            const group = mmdMesh.geometry.groups.find((g) => g.materialIndex === foreheadMatIdx);
+            if (group) {
+              const skinIndexAttr = mmdMesh.geometry.attributes.skinIndex;
+              const skinWeightAttr = mmdMesh.geometry.attributes.skinWeight;
+              if (skinIndexAttr && skinWeightAttr) {
+                const start = group.start;
+                const count = group.count;
+                const indexAttr = mmdMesh.geometry.index;
+                const vertexIndices = new Set<number>();
+                if (indexAttr) {
+                  for (let i = start; i < start + count; i++) {
+                    vertexIndices.add(indexAttr.getX(i));
+                  }
+                } else {
+                  for (let i = start; i < start + count; i++) {
+                    vertexIndices.add(i);
+                  }
+                }
+
+                vertexIndices.forEach((vIdx) => {
+                  skinIndexAttr.setXYZW(vIdx, headBoneIdx, 0, 0, 0);
+                  skinWeightAttr.setXYZW(vIdx, 1.0, 0, 0, 0);
+                });
+
+                skinIndexAttr.needsUpdate = true;
+                skinWeightAttr.needsUpdate = true;
+              }
+            }
+          }
+        }
 
         // Create 2 Soft Porcelain Cheek Decals
         const createCheekMesh = (xPos: number) => {
@@ -507,12 +648,17 @@ export const Scene: React.FC<SceneProps> = React.memo(({
       const elapsedTime = clock.getElapsedTime();
       
       // Normalize & Map Emotion Tags cleanly
-      const rawEmo = (currentEmotionRef.current || 'neutral').toLowerCase().trim();
+      const rawEmo = (currentEmotionRef.current || 'relaxed').toLowerCase().trim();
       let emo = rawEmo;
       if (rawEmo === 'smirk' || rawEmo === 'excited') emo = 'happy';
       else if (rawEmo === 'determined') emo = 'angry';
       else if (rawEmo === 'shy' || rawEmo === 'embarrassed') emo = 'blush';
-      else if (rawEmo === 'calm' || rawEmo === 'peaceful') emo = 'relaxed';
+      else if (rawEmo === 'flustered' || rawEmo === 'crimson' || rawEmo === 'blush_hardly' || rawEmo === 'hard_blush') emo = 'blush-hardly';
+      else if (rawEmo === 'playful' || rawEmo === 'tease' || rawEmo === 'proud' || rawEmo === 'smug') emo = 'teasing';
+      else if (rawEmo === 'envious') emo = 'jealous';
+      else if (rawEmo === 'panic' || rawEmo === 'scared') emo = 'terrified';
+      else if (rawEmo === 'sulk' || rawEmo === 'sulking') emo = 'pouting';
+      else if (rawEmo === 'calm' || rawEmo === 'peaceful' || rawEmo === 'neutral') emo = 'relaxed';
       else if (rawEmo === 'shocked') emo = 'surprised';
 
       // Lightweight Hover Cursor Check (0.0001ms execution time)
@@ -576,8 +722,22 @@ export const Scene: React.FC<SceneProps> = React.memo(({
       }
 
       if (headBoneRef.current) {
-        headBoneRef.current.rotation.y += ((targetHeadYaw * 0.5) - headBoneRef.current.rotation.y) * 0.1;
-        headBoneRef.current.rotation.x += ((targetHeadPitch * 0.5) - headBoneRef.current.rotation.x) * 0.1;
+        let extraHeadPitch = 0;
+        let extraHeadYaw = 0;
+        if (emo === 'blush-hardly') {
+          extraHeadPitch = 0.14; // bashfully looking down
+          extraHeadYaw = -0.12;  // looking away
+        } else if (emo === 'teasing') {
+          extraHeadPitch = -0.06; // chin up
+        } else if (emo === 'jealous' || emo === 'pouting') {
+          extraHeadYaw = 0.12; // sulking head turn
+        } else if (emo === 'terrified') {
+          extraHeadPitch = 0.22; // Downward head tilt looking up nervously
+          extraHeadYaw = Math.sin(elapsedTime * 35.0) * 0.018; // High-frequency horror trembling
+        }
+
+        headBoneRef.current.rotation.y += (((targetHeadYaw * 0.5) + extraHeadYaw) - headBoneRef.current.rotation.y) * 0.1;
+        headBoneRef.current.rotation.x += (((targetHeadPitch * 0.5) + extraHeadPitch) - headBoneRef.current.rotation.x) * 0.1;
       }
 
       hairBonesRef.current.forEach(({ bone, baseRotZ, baseRotX, phase }) => {
@@ -675,6 +835,27 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         } else if (emo === 'blush') {
           targetSmallMouth = 0.45;
           targetSadEyebrow = 0.35;
+        } else if (emo === 'blush-hardly') {
+          targetSmallMouth = 0.65;
+          targetSadEyebrow = 0.60;
+          targetRelaxedEye = 0.45;
+        } else if (emo === 'teasing') {
+          targetSmileMouth = 0.65;
+          targetRelaxedEye = 0.55;
+          targetRelaxedEyebrow = 0.35;
+        } else if (emo === 'jealous') {
+          targetFrownMouth = 0.75;
+          targetAngryEyebrow = 0.45;
+          targetRelaxedEye = 0.40;
+        } else if (emo === 'terrified') {
+          targetSadEyebrow = 0.95; // Deep distressed downturned sad inner eyebrows (困る)
+          targetSurprisedEye = 0.85; // Panicked wide pupils (びっくり)
+          targetFrownMouth = 0.45; // Distressed trembling mouth
+          targetSmallMouth = 0.35;
+        } else if (emo === 'pouting') {
+          targetFrownMouth = 0.85;
+          targetAngryEyebrow = 0.55;
+          targetSmallMouth = 0.35;
         } else if (emo === 'relaxed') {
           targetSmileMouth = 0.35;
           targetRelaxedEyebrow = 0.45;
@@ -710,27 +891,27 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           const combinedWave = Math.max(0, (speechWave1 + speechWave2 + speechWave3) * 0.55);
           const openPower = Math.pow(combinedWave, 1.1) * organicFactor;
 
-          if (emo === 'sad') {
-            // Melancholy speech: NO smile, keep gentle sad downturned mouth corners (0.22)
+          if (emo === 'sad' || emo === 'terrified') {
+            // Melancholy / Terrified speech: NO smile, keep gentle sad downturned mouth corners (0.22)
             targetSmileMouth = 0;
             targetFrownMouth = 0.22;
             targetSmallMouth = 0;
             targetVowelA = Math.min(0.35, openPower * 0.40);
             targetVowelI = Math.abs(Math.sin(t * 9.0)) * 0.15 * organicFactor;
             targetVowelO = Math.abs(Math.sin(t * 6.0)) * 0.20 * organicFactor;
-          } else if (emo === 'angry') {
-            // Determined/Angry speech: NO smile, keep firm mouth tension
+          } else if (emo === 'angry' || emo === 'jealous' || emo === 'pouting') {
+            // Determined/Angry/Jealous speech: NO smile, keep firm mouth tension
             targetSmileMouth = 0;
             targetFrownMouth = 0.28;
             targetSmallMouth = 0;
             targetVowelA = Math.min(0.42, openPower * 0.48);
-          } else if (emo === 'blush') {
+          } else if (emo === 'blush' || emo === 'blush-hardly') {
             // Shy speech: keep subtle blushing small mouth
             targetSmileMouth = 0.20;
-            targetSmallMouth = 0.25 * (1 - openPower);
+            targetSmallMouth = 0.35 * (1 - openPower);
             targetVowelA = Math.min(0.35, openPower * 0.38);
           } else {
-            // Happy / Relaxed / Neutral speech: sweet anime smile base
+            // Happy / Teasing / Smug / Relaxed / Neutral speech: sweet anime smile base
             targetSmileMouth = 0.35;
             targetVowelA = Math.min(0.52, openPower * 0.55);
             targetVowelI = Math.abs(Math.sin(t * 11.2)) * 0.22 * organicFactor;
@@ -740,10 +921,18 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         }
 
         // Smoothly fade soft rose-peach cheekbone blush
-        const targetCheekOpacity = emo === 'blush' ? 0.65 : 0;
+        const targetCheekOpacity = emo === 'blush-hardly' ? 0.95 : (emo === 'blush' ? 0.65 : (emo === 'teasing' ? 0.35 : (emo === 'jealous' || emo === 'pouting' ? 0.25 : 0)));
         cheekMaterialsRef.current.forEach((mat) => {
           mat.opacity += (targetCheekOpacity - mat.opacity) * 0.15;
         });
+
+        // Smoothly fade anime forehead horror/shock dark shadow overlay
+        const targetForeheadOpacity = emo === 'terrified' ? 0.90 : 0;
+        if (foreheadShadowMaterialRef.current) {
+          foreheadShadowMaterialRef.current.opacity += (targetForeheadOpacity - foreheadShadowMaterialRef.current.opacity) * 0.15;
+        }
+
+
 
         // Dynamic Map-based Morph Lerp (Prevents alias collision skips for shared indices like じと目)
         const targetMap = new Map<number, number>();
@@ -839,21 +1028,23 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           {modelLoaded ? `3D Viewport • ${loadStatus}` : loadStatus}
         </span>
         <span className="current-emotion-badge">
-          Expression: {currentEmotion || 'Neutral'}
+          Expression: {currentEmotion || 'Relaxed'}
         </span>
 
-        {/* Temporary Emotion Testing Chips */}
+        {/* Vertical Emotion Testing Toolbar */}
         <div className="testing-emotions-bar">
-          <span className="testing-label">Test Expression:</span>
-          {TESTING_EMOTIONS.map((emo) => (
-            <button
-              key={emo.id}
-              className={`emotion-test-btn ${currentEmotion === emo.id ? 'active' : ''}`}
-              onClick={() => onSelectEmotion?.(emo.id)}
-            >
-              {emo.label}
-            </button>
-          ))}
+          <span className="testing-label">Test Expression</span>
+          <div className="testing-emotions-list">
+            {TESTING_EMOTIONS.map((emo) => (
+              <button
+                key={emo.id}
+                className={`emotion-test-btn ${currentEmotion === emo.id ? 'active' : ''}`}
+                onClick={() => onSelectEmotion?.(emo.id)}
+              >
+                {emo.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

@@ -19,7 +19,7 @@ export function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [activeSpeakingId, setActiveSpeakingId] = useState<string | null>(null);
-  const [currentEmotion, setCurrentEmotion] = useState<string>('Neutral');
+  const [currentEmotion, setCurrentEmotion] = useState<string>('relaxed');
 
   // Modals state
   const [showSettings, setShowSettings] = useState(false);

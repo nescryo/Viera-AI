@@ -536,11 +536,27 @@ class TTSService {
     return [];
   }
 
-  private detectEmotionFromText(text: string): 'tsundere' | 'sweet' | 'whisper' | 'sad' | 'joy' | 'shy' | 'neutral' {
+  private detectEmotionFromText(text: string): 'tsundere' | 'sweet' | 'whisper' | 'sad' | 'joy' | 'shy' | 'blush-hardly' | 'teasing' | 'jealous' | 'terrified' | 'pouting' | 'relaxed' {
     const lower = text.toLowerCase();
     
     // Explicit action asterisks or explicit emotion tags
-    if (/\*(?:blushes|pouts|angry|tsundere|shouts|yells)\*/i.test(text) || /tsundere|baka|shut up|idiot|h-mph|hmph|don'?t get the wrong idea|marah|cemburu|ばか|バーカ/i.test(lower)) {
+    if (/\[blush-hardly\]/i.test(text) || /\*(?:blushes hard|blushing hardly|flustered|crimson)\*/i.test(text) || /aku cinta kamu|i love you|marry me|cinta kamu/i.test(lower)) {
+      return 'blush-hardly';
+    }
+    if (/\[terrified\]/i.test(text) || /\*(?:terrified|screams|trembles|scared)\*/i.test(text) || /hantu|takut|ghost|scary|seram/i.test(lower)) {
+      return 'terrified';
+    }
+    if (/\[teasing\]|\[smug\]/i.test(text) || /\*(?:smirks|teases|winks|playful|smug|proud)\*/i.test(text) || /goda|tease|jahil|ehe|hebat|pintar|smart|pro/i.test(lower)) {
+      return 'teasing';
+    }
+    if (/\[jealous\]/i.test(text) || /\*(?:jealous|glares jealous)\*/i.test(text) || /cewek lain|wanita lain|other girl/i.test(lower)) {
+      return 'jealous';
+    }
+    if (/\[pouting\]/i.test(text) || /\*(?:pouts|puffs cheeks|sulking)\*/i.test(text) || /cemberut|pout|ngambek/i.test(lower)) {
+      return 'pouting';
+    }
+
+    if (/\*(?:blushes|pouts|angry|tsundere|shouts|yells)\*/i.test(text) || /tsundere|baka|shut up|idiot|h-mph|hmph|don'?t get the wrong idea|marah|ばか|バーカ/i.test(lower)) {
       return 'tsundere';
     }
     if (/\*(?:whispers|berbisik|bisik)\*/i.test(text) || /\b(?:whispers|berbisik)\b/i.test(lower)) {
@@ -558,12 +574,12 @@ class TTSService {
     if (text.includes('!') || text.includes('！')) {
       return 'joy';
     }
-    return 'neutral';
+    return 'relaxed';
   }
 
   private resolveEmotionSpeakerStyle(
     baseSpeakerId: number,
-    emotion: 'tsundere' | 'sweet' | 'whisper' | 'sad' | 'joy' | 'shy' | 'neutral',
+    emotion: string,
     speakers: VoicevoxSpeaker[]
   ): number {
     if (!speakers || speakers.length === 0) return baseSpeakerId;
@@ -575,15 +591,16 @@ class TTSService {
 
     let styleMatch: VoicevoxStyle | undefined;
 
-    if (emotion === 'tsundere') {
+    if (emotion === 'tsundere' || emotion === 'jealous' || emotion === 'pouting') {
       styleMatch = targetSpeaker.styles.find(s => /ツン|怒|ツンデレ/i.test(s.name));
-    } else if (emotion === 'sweet' || emotion === 'joy' || emotion === 'shy') {
-      // For sweet/joy/shy, prefer base selected style or lively normal style to avoid slow sleepy drawl
+    } else if (emotion === 'sweet' || emotion === 'joy' || emotion === 'shy' || emotion === 'teasing' || emotion === 'smug') {
       styleMatch = targetSpeaker.styles.find(s => s.id === baseSpeakerId) || targetSpeaker.styles.find(s => /ノーマル|通常/i.test(s.name));
     } else if (emotion === 'whisper') {
       styleMatch = targetSpeaker.styles.find(s => /ささやき|ウィスパー/i.test(s.name));
-    } else if (emotion === 'sad') {
+    } else if (emotion === 'sad' || emotion === 'blush-hardly') {
       styleMatch = targetSpeaker.styles.find(s => /悲|なみだ|泣/i.test(s.name));
+    } else if (emotion === 'terrified') {
+      styleMatch = targetSpeaker.styles.find(s => /驚|叫び|怒/i.test(s.name));
     }
 
     // Protection: Never pick a creepy whisper style (ヒソヒソ) for non-whisper emotions!
