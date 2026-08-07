@@ -30,6 +30,7 @@ class TTSService {
   }
 
   private currentBufferSource: AudioBufferSourceNode | null = null;
+  private currentSpeechSessionId: number = 0;
 
   // Point 4: Web Audio API AudioContext & Acoustic Polish Methods
   private getAudioContext(): AudioContext {
@@ -274,6 +275,7 @@ class TTSService {
   }
 
   public stop() {
+    this.currentSpeechSessionId++;
     this.audioQueue = [];
     this.isProcessingQueue = false;
     if (this.currentBufferSource) {
@@ -913,6 +915,7 @@ class TTSService {
     onStart?: () => void,
     onEnd?: () => void
   ) {
+    const currentSessionId = ++this.currentSpeechSessionId;
     const apiKey = apiConfig?.fishAudioApiKey || apiConfig?.openRouterApiKey;
     let refId = apiConfig?.fishAudioReferenceId || '';
     const dummyIds = [
@@ -935,6 +938,7 @@ class TTSService {
     try {
       // Auto translate English text to Japanese for authentic anime dubbing if Japanese voice model is selected
       const jaText = await this.translateToJapanese(text);
+      if (currentSessionId !== this.currentSpeechSessionId) return;
 
       const emotion = this.detectEmotionFromText(text);
       let synthText = jaText;
@@ -984,6 +988,8 @@ class TTSService {
         body: JSON.stringify(payload)
       });
 
+      if (currentSessionId !== this.currentSpeechSessionId) return;
+
       // Retry 1: If 400 Bad Request (Reference not found), retry without reference_id using default system voice!
       if (!response.ok && response.status === 400) {
         console.warn("[Viera TTS Warning] Reference ID not found on Fish Audio. Retrying with Fish Audio default system voice...");
@@ -1016,6 +1022,8 @@ class TTSService {
         });
       }
 
+      if (currentSessionId !== this.currentSpeechSessionId) return;
+
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
         console.error(`[Viera TTS Error] Fish Audio returned status ${response.status}:`, errText);
@@ -1023,15 +1031,23 @@ class TTSService {
       }
 
       const arrayBuffer = await response.arrayBuffer();
+      if (currentSessionId !== this.currentSpeechSessionId) return;
 
       // Play via Web Audio API Acoustic Polish & Lip Sync Analyser
       await this.playProcessedArrayBuffer(
         arrayBuffer,
-        onStart,
-        onEnd,
+        () => {
+          if (currentSessionId !== this.currentSpeechSessionId) return;
+          if (onStart) onStart();
+        },
+        () => {
+          if (currentSessionId !== this.currentSpeechSessionId) return;
+          if (onEnd) onEnd();
+        },
         () => this.speakEdgeNeural(text, persona, onStart, onEnd)
       );
     } catch (err) {
+      if (currentSessionId !== this.currentSpeechSessionId) return;
       console.warn("[Viera TTS Warning] Fish Audio fetch failed, falling back to Edge Neural Voice:", err);
       this.speakEdgeNeural(text, persona, onStart, onEnd);
     }
@@ -1051,7 +1067,8 @@ class TTSService {
   public isSpeaking(): boolean {
     const isSynthSpeaking = this.synth ? this.synth.speaking : false;
     const isAudioPlaying = this.currentAudio ? !this.currentAudio.paused : false;
-    return isSynthSpeaking || isAudioPlaying;
+    const isBufferPlaying = this.currentBufferSource !== null;
+    return isSynthSpeaking || isAudioPlaying || isBufferPlaying;
   }
 }
 

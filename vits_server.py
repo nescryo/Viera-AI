@@ -46,7 +46,11 @@ class VitsHandler(BaseHTTPRequestHandler):
                     self.end_headers()
                     self.wfile.write(audio_data)
                 else:
-                    self.send_error(500, "Failed to generate audio: edge-tts CLI missing or execution failed")
+                    self.send_response(500)
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.send_header('Content-Type', 'text/plain')
+                    self.end_headers()
+                    self.wfile.write(b"Failed to generate audio: edge-tts CLI missing or execution failed")
             finally:
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
@@ -64,7 +68,7 @@ class VitsHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 def run_server():
-    server_address = ('localhost', 5000)
+    server_address = ('0.0.0.0', 5000)
     httpd = ThreadingHTTPServer(server_address, VitsHandler)
     print("=====================================================")
     print("🚀 Viera Local VITS Anime Voice Server Running (Threaded)!")
