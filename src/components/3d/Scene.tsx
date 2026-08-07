@@ -565,9 +565,17 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 
     let chestTouchCount = 0;
     let chestTouchResetTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastInteractionTime = 0;
 
     const handlePointerClick = (clientX: number, clientY: number) => {
       if (isDisposed || !containerRef.current || !mmdMeshRef.current) return;
+
+      // Cooldown & Speaking Guard: Ignore click spam if Firefly is speaking or interacted within 1.2s
+      const now = Date.now();
+      if (isSpeakingRef.current || ttsService.isSpeaking() || now - lastInteractionTime < 1200) {
+        return;
+      }
+
       updatePointerTracking(clientX, clientY);
 
       const rect = containerRef.current.getBoundingClientRect();
@@ -581,6 +589,9 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         const hit = intersects[0];
         const hitPoint = hit.point;
         const relX = Math.abs(hitPoint.x - (-0.65)); // Relative X offset from Firefly model center (-0.65)
+
+        // Record interaction time to throttle click spam
+        lastInteractionTime = now;
 
         // Strict Head Pat Zone ONLY (Top of Head & Hair: y >= 1.35 and relX < 0.28)
         if (relX < 0.28 && hitPoint.y >= 1.35) {

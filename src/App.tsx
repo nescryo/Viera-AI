@@ -106,7 +106,7 @@ export function App() {
       setActiveSessionId(null);
       setMessages([]);
     }
-  }, [userProfile]);
+  }, [userProfile, currentPersona.id, apiConfig.provider]);
 
   // Sync messages change back to active session storage
   const syncMessagesToSession = (newMessages: ChatMessage[]) => {
