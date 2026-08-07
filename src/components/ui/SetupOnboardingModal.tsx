@@ -1,11 +1,18 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { UserProfile } from '../../types';
-import { UserCheck, Sparkles, Pencil, AlertCircle } from 'lucide-react';
+import { UserCheck, Sparkles, Pencil, AlertCircle, ChevronDown, Check } from 'lucide-react';
 
 interface SetupOnboardingModalProps {
   initialProfile: Partial<UserProfile> & { name?: string };
   onCompleteSetup: (completedProfile: UserProfile) => void;
 }
+
+const GENDER_OPTIONS = [
+  { value: 'unspecified', label: 'Secret / Unspecified' },
+  { value: 'female', label: 'Female' },
+  { value: 'male', label: 'Male' },
+  { value: 'non-binary', label: 'Non-binary' }
+] as const;
 
 export const SetupOnboardingModal: React.FC<SetupOnboardingModalProps> = ({
   initialProfile,
@@ -15,9 +22,21 @@ export const SetupOnboardingModal: React.FC<SetupOnboardingModalProps> = ({
   const [nickname, setNickname] = useState<string>(initialProfile.nickname || initialProfile.name || '');
   const [picture, setPicture] = useState<string>(initialProfile.picture || 'https://api.dicebear.com/7.x/bottts/svg?seed=viera');
   const [gender, setGender] = useState<'male' | 'female' | 'non-binary' | 'unspecified'>(initialProfile.gender || 'unspecified');
+  const [isGenderOpen, setIsGenderOpen] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const genderDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (genderDropdownRef.current && !genderDropdownRef.current.contains(e.target as Node)) {
+        setIsGenderOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleAvatarClick = () => {
     if (fileInputRef.current) {
@@ -77,13 +96,15 @@ export const SetupOnboardingModal: React.FC<SetupOnboardingModalProps> = ({
       nickname: nickname.trim(),
       picture,
       gender,
-      bio: initialProfile.bio || 'I love code and 3D anime companions!',
+      bio: initialProfile.bio || '',
       isSetupComplete: true,
       createdAt: initialProfile.createdAt || Date.now()
     };
 
     onCompleteSetup(finalProfile);
   };
+
+  const currentGenderObj = GENDER_OPTIONS.find((g) => g.value === gender) || GENDER_OPTIONS[0];
 
   return (
     <div className="modal-backdrop onboarding-backdrop">
@@ -149,19 +170,34 @@ export const SetupOnboardingModal: React.FC<SetupOnboardingModalProps> = ({
             <div className="cai-char-counter">{nickname.length}/20</div>
           </div>
 
-          {/* c.ai Style Input Box 3: Gender Select */}
-          <div className="cai-input-group">
+          {/* Modernized Glass Dropdown: Gender */}
+          <div className="cai-input-group cai-dropdown-group" ref={genderDropdownRef}>
             <label className="cai-input-label">Gender</label>
-            <select
-              value={gender}
-              onChange={(e) => setGender(e.target.value as any)}
-              className="cai-field-select"
+            <div
+              className="cai-custom-select-trigger"
+              onClick={() => setIsGenderOpen((prev) => !prev)}
             >
-              <option value="unspecified">Secret / Unspecified</option>
-              <option value="female">Female</option>
-              <option value="male">Male</option>
-              <option value="non-binary">Non-binary</option>
-            </select>
+              <span className="selected-gender-text">{currentGenderObj.label}</span>
+              <ChevronDown size={16} className={`dropdown-arrow ${isGenderOpen ? 'open' : ''}`} />
+            </div>
+
+            {isGenderOpen && (
+              <div className="cai-custom-dropdown-menu glass-panel">
+                {GENDER_OPTIONS.map((option) => (
+                  <div
+                    key={option.value}
+                    className={`cai-dropdown-option ${gender === option.value ? 'selected' : ''}`}
+                    onClick={() => {
+                      setGender(option.value);
+                      setIsGenderOpen(false);
+                    }}
+                  >
+                    <span>{option.label}</span>
+                    {gender === option.value && <Check size={14} className="option-check" />}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Complete Button */}

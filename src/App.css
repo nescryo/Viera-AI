@@ -275,9 +275,9 @@
 }
 
 .provider-pill.online {
-  border-color: rgba(82, 196, 26, 0.4);
-  background: rgba(82, 196, 26, 0.08);
-  color: #a0d911;
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.08);
+  color: #60a5fa;
 }
 
 .provider-pill.offline {
@@ -287,8 +287,8 @@
 }
 
 .dot-online {
-  background-color: #52c41a !important;
-  box-shadow: 0 0 8px #52c41a;
+  background-color: #3b82f6 !important;
+  box-shadow: 0 0 8px #3b82f6;
 }
 
 .dot-offline {
@@ -1012,14 +1012,14 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(88, 101, 242, 0.2), rgba(82, 196, 26, 0.2));
+  background: linear-gradient(135deg, rgba(88, 101, 242, 0.2), rgba(59, 130, 246, 0.2));
   border: 1px solid var(--accent-green);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--accent-green);
   margin-bottom: 16px;
-  box-shadow: 0 0 25px rgba(82, 196, 26, 0.3);
+  box-shadow: 0 0 25px rgba(59, 130, 246, 0.3);
 }
 
 .login-title {
@@ -1196,7 +1196,7 @@
 
 .setup-complete-btn {
   margin-top: 10px;
-  background: linear-gradient(135deg, #52c41a, #2b8a0e);
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
   color: #fff;
   font-weight: 700;
   padding: 12px 20px;
@@ -1207,13 +1207,13 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  box-shadow: 0 4px 15px rgba(82, 196, 26, 0.3);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
   transition: all 0.2s ease;
 }
 
 .setup-complete-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(82, 196, 26, 0.45);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.45);
 }
 
 /* ==========================================================================
@@ -1253,7 +1253,7 @@
   align-items: center;
   gap: 6px;
   background: var(--accent-green);
-  color: #0d1a08;
+  color: #ffffff;
   font-weight: 700;
   font-size: 0.85rem;
   padding: 8px 16px;
@@ -1261,7 +1261,7 @@
   border: none;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 10px rgba(82, 196, 26, 0.25);
+  box-shadow: 0 2px 10px rgba(59, 130, 246, 0.3);
 }
 
 .new-chat-btn-top:hover {
@@ -1308,9 +1308,9 @@
 }
 
 .history-card-item.active {
-  background: linear-gradient(135deg, rgba(82, 196, 26, 0.15), rgba(30, 31, 34, 0.9));
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(30, 31, 34, 0.9));
   border: 1px solid var(--accent-green);
-  box-shadow: 0 0 15px rgba(82, 196, 26, 0.15);
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
 }
 
 .card-main-info {
@@ -1349,9 +1349,9 @@
   font-weight: 800;
   padding: 3px 8px;
   border-radius: 4px;
-  background: rgba(82, 196, 26, 0.15);
+  background: rgba(59, 130, 246, 0.15);
   color: var(--accent-green);
-  border: 1px solid rgba(82, 196, 26, 0.3);
+  border: 1px solid rgba(59, 130, 246, 0.3);
   letter-spacing: 0.05em;
 }
 
@@ -1527,7 +1527,7 @@
 
 .cai-profile-banner {
   height: 110px;
-  background: linear-gradient(135deg, rgba(88, 101, 242, 0.3), rgba(82, 196, 26, 0.3));
+  background: linear-gradient(135deg, rgba(88, 101, 242, 0.3), rgba(59, 130, 246, 0.3));
   position: relative;
   display: flex;
   justify-content: center;
@@ -1541,7 +1541,7 @@
   border-radius: 50%;
   padding: 4px;
   background: var(--bg-primary);
-  box-shadow: 0 0 20px rgba(82, 196, 26, 0.4);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
 }
 
 .cai-avatar-lg {
@@ -1593,9 +1593,9 @@
 }
 
 .stat-chip.accent {
-  background: rgba(82, 196, 26, 0.12);
+  background: rgba(59, 130, 246, 0.15);
   color: var(--accent-green);
-  border-color: rgba(82, 196, 26, 0.3);
+  border-color: rgba(59, 130, 246, 0.35);
 }
 
 .cai-bio-box {
@@ -1611,6 +1611,12 @@
   font-style: italic;
   color: var(--text-normal);
   line-height: 1.45;
+}
+
+.cai-bio-text.empty-bio-muted {
+  font-style: normal;
+  color: var(--text-muted);
+  font-size: 0.82rem;
 }
 
 .cai-action-bar {
@@ -1687,7 +1693,7 @@
 .save-edit-btn {
   flex: 1;
   background: var(--accent-green);
-  color: #0d1a08;
+  color: #ffffff;
   font-weight: 700;
   padding: 10px;
   border-radius: var(--radius-md);
@@ -1716,6 +1722,8 @@
   padding: 32px 28px;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-glass);
+  overflow: visible !important;
+  position: relative;
 }
 
 .cai-avatar-upload-box {
@@ -1742,7 +1750,7 @@
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid var(--accent-green);
-  box-shadow: 0 0 20px rgba(82, 196, 26, 0.25);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
   transition: filter 0.2s ease;
 }
 
@@ -1798,7 +1806,7 @@
 .cai-input-group:focus-within {
   border-color: var(--accent-green);
   background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 0 12px rgba(82, 196, 26, 0.15);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
 }
 
 .cai-input-label {
@@ -1842,7 +1850,7 @@
 .cai-submit-btn {
   margin-top: 8px;
   background: var(--accent-green);
-  color: #0d1a08;
+  color: #ffffff;
   font-weight: 700;
   padding: 12px 20px;
   border-radius: var(--radius-lg);
@@ -1852,7 +1860,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  box-shadow: 0 4px 15px rgba(82, 196, 26, 0.25);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
   transition: all 0.2s ease;
 }
 
@@ -1860,5 +1868,83 @@
   filter: brightness(1.1);
   transform: translateY(-1px);
 }
+
+/* Custom Glass Gender Dropdown Component */
+.cai-dropdown-group {
+  cursor: pointer;
+}
+
+.cai-custom-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding-top: 2px;
+  user-select: none;
+}
+
+.selected-gender-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.dropdown-arrow {
+  color: var(--text-muted);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+  color: var(--accent-green);
+}
+
+.cai-custom-dropdown-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: rgba(22, 24, 30, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-lg);
+  padding: 6px;
+  z-index: 9999;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cai-dropdown-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cai-dropdown-option:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-normal);
+}
+
+.cai-dropdown-option.selected {
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--accent-green);
+  font-weight: 700;
+}
+
+.option-check {
+  color: var(--accent-green);
+}
+
+
 
 

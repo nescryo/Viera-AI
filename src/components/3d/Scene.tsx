@@ -221,7 +221,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     scene.add(frontLight);
 
     // 3. Ground Pedestal & Grid
-    const gridHelper = new THREE.GridHelper(10, 20, 0x52c41a, 0x2b2d31);
+    const gridHelper = new THREE.GridHelper(10, 20, 0x3b82f6, 0x2b2d31);
     gridHelper.position.set(-0.65, 0, 0);
     scene.add(gridHelper);
 
@@ -238,7 +238,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     const particleMaterial = new THREE.PointsMaterial({
-      color: new THREE.Color(currentPersona.accentColor || '#52c41a'),
+      color: new THREE.Color(currentPersona.accentColor || '#3b82f6'),
       size: 0.035,
       transparent: true,
       opacity: 0.65

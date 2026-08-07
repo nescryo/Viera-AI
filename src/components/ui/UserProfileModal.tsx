@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { UserProfile } from '../../types';
-import { Edit3, LogOut, X, Check, User, Heart, Sparkles, Pencil } from 'lucide-react';
+import { Edit3, LogOut, X, Check, User, Sparkles, Pencil, ChevronDown } from 'lucide-react';
 
 interface UserProfileModalProps {
   userProfile: UserProfile;
@@ -8,6 +8,13 @@ interface UserProfileModalProps {
   onLogout: () => void;
   onClose: () => void;
 }
+
+const GENDER_OPTIONS = [
+  { value: 'unspecified', label: 'Secret / Unspecified' },
+  { value: 'female', label: 'Female' },
+  { value: 'male', label: 'Male' },
+  { value: 'non-binary', label: 'Non-binary' }
+] as const;
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   userProfile,
@@ -20,10 +27,22 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [username, setUsername] = useState<string>(userProfile.username || '@user');
   const [picture, setPicture] = useState<string>(userProfile.picture || '');
   const [gender, setGender] = useState<'male' | 'female' | 'non-binary' | 'unspecified'>(userProfile.gender || 'unspecified');
-  const [bio, setBio] = useState<string>(userProfile.bio || 'I love code and 3D anime companions!');
+  const [isGenderOpen, setIsGenderOpen] = useState<boolean>(false);
+  const [bio, setBio] = useState<string>(userProfile.bio ?? '');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const genderDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (genderDropdownRef.current && !genderDropdownRef.current.contains(e.target as Node)) {
+        setIsGenderOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleAvatarClick = () => {
     if (isEditing && fileInputRef.current) {
@@ -78,6 +97,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setErrorMsg(null);
   };
 
+  const currentGenderObj = GENDER_OPTIONS.find((g) => g.value === gender) || GENDER_OPTIONS[0];
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-container cai-profile-card glass-panel" onClick={(e) => e.stopPropagation()}>
@@ -113,7 +134,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         {/* Content Body */}
         <div className="cai-profile-body">
           {!isEditing ? (
-            /* VIEW PROFILE MODE (Matches c.ai Profile Design) */
+            /* VIEW PROFILE MODE */
             <div className="view-profile-mode">
               <h2 className="cai-nickname">{userProfile.nickname || 'User'}</h2>
               <span className="cai-username">{userProfile.username}</span>
@@ -124,15 +145,15 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   <User size={13} />
                   {userProfile.gender === 'female' ? 'Female' : userProfile.gender === 'male' ? 'Male' : userProfile.gender === 'non-binary' ? 'Non-binary' : 'Secret'}
                 </span>
-                <span className="stat-chip accent">
-                  <Heart size={13} />
-                  Firefly Companion
-                </span>
               </div>
 
               {/* Bio Quote */}
               <div className="cai-bio-box">
-                <p className="cai-bio-text">"{userProfile.bio || 'I love code and 3D anime companions!'}"</p>
+                <p className={`cai-bio-text ${!userProfile.bio || !userProfile.bio.trim() ? 'empty-bio-muted' : ''}`}>
+                  {userProfile.bio && userProfile.bio.trim() !== ''
+                    ? `"${userProfile.bio}"`
+                    : "This user hasn't created a bio yet."}
+                </p>
               </div>
 
               {/* Action Buttons */}
@@ -148,7 +169,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </div>
             </div>
           ) : (
-            /* EDIT PROFILE MODE (Matches c.ai Input Card Layout) */
+            /* EDIT PROFILE MODE */
             <form onSubmit={handleSaveEdit} className="edit-profile-form">
               <h3 className="edit-form-title">
                 <Sparkles size={16} />
@@ -185,19 +206,34 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <div className="cai-char-counter">{nickname.length}/20</div>
               </div>
 
-              {/* Box 3: Gender */}
-              <div className="cai-input-group">
+              {/* Box 3: Modern Gender Dropdown */}
+              <div className="cai-input-group cai-dropdown-group" ref={genderDropdownRef}>
                 <label className="cai-input-label">Gender</label>
-                <select
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value as any)}
-                  className="cai-field-select"
+                <div
+                  className="cai-custom-select-trigger"
+                  onClick={() => setIsGenderOpen((prev) => !prev)}
                 >
-                  <option value="unspecified">Secret / Unspecified</option>
-                  <option value="female">Female</option>
-                  <option value="male">Male</option>
-                  <option value="non-binary">Non-binary</option>
-                </select>
+                  <span className="selected-gender-text">{currentGenderObj.label}</span>
+                  <ChevronDown size={16} className={`dropdown-arrow ${isGenderOpen ? 'open' : ''}`} />
+                </div>
+
+                {isGenderOpen && (
+                  <div className="cai-custom-dropdown-menu glass-panel">
+                    {GENDER_OPTIONS.map((option) => (
+                      <div
+                        key={option.value}
+                        className={`cai-dropdown-option ${gender === option.value ? 'selected' : ''}`}
+                        onClick={() => {
+                          setGender(option.value);
+                          setIsGenderOpen(false);
+                        }}
+                      >
+                        <span>{option.label}</span>
+                        {gender === option.value && <Check size={14} className="option-check" />}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Box 4: Bio */}
