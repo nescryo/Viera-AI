@@ -1,6 +1,6 @@
 # Viera — System Architecture & Workflow Guide
 
-This document outlines the system architecture, data flow pipelines, and interactive workflows of **Viera**, making it easy for reviewers and developers to understand how the 3D graphics, local AI, and voice synthesis modules interact.
+This document outlines the system architecture, data flow pipelines, authentication gates, and interactive workflows of **Viera**, making it easy for reviewers and developers to understand how the 3D graphics, local/cloud AI, voice synthesis modules, and user profile honorific systems interact.
 
 ---
 
@@ -8,30 +8,40 @@ This document outlines the system architecture, data flow pipelines, and interac
 
 ```mermaid
 graph TD
-    A[" User Input (Chat / 3D Touch)"] --> B["🖥️ React 19 Frontend UI"]
+    A["👤 User Access"] --> B{"Google OAuth Gate"}
+    B -->|Not Logged In| C["🔐 Login Gate Modal (Google GIS)"]
+    C -->|Success JWT| D{"Complete Your Setup Check"}
+    D -->|First Time| E["📝 Setup Onboarding Modal (c.ai Style)"]
+    D -->|Setup Complete| F["🖥️ Main App Viewport & 3D Stage"]
     
-    subgraph "AI & Natural Language Processing"
-        B -->|Send Message| C["🧠 LM Studio / Cloud LLM"]
-        C -->|Native Japanese Output| D["🌸 Native Anime Japanese Stream"]
+    subgraph "Conversation History & Multi-Session Storage"
+        F --> G["📜 Conversation History Modal (Project Airi)"]
+        G <-->|Per-User LocalStorage| H[("viera_sessions_userId")]
     end
 
-    subgraph "Voice Synthesis Engine"
-        D -->|Instant Audio Query| E["🎙️ VOICEVOX Server (port 50021)"]
-        E -->|WAV Audio Stream| F["🔊 Web Audio API (Headphone Output)"]
+    subgraph "AI & Honorific Processing Pipeline"
+        F -->|Send Message| I["🏷️ Honorific Resolver (getUserFormattedName)"]
+        I -->|Inject Name + -san / -chan| J["🧠 LLM Engine (DeepSeek / LM Studio)"]
+        J -->|Native Japanese Speech| K["🌸 Character Output Stream"]
     end
 
-    subgraph "Async Translation & UI Render"
-        D -->|Async JA -> EN Translate| G["💬 English Subtitle Formatter"]
-        G -->|Clean English Text| B
+    subgraph "Voice Synthesis & TTS Normalization"
+        K -->|Preprocess -san/-chan -> さん/ちゃん| L["🎙️ VOICEVOX Engine (port 50021)"]
+        L -->|WAV Audio Stream| M["🔊 Web Audio API DSP (Equalizer & Reverb)"]
+    end
+
+    subgraph "Async Translation & Subtitle Formatting"
+        K -->|Async JA -> EN Translate| N["💬 Subtitle Translator & Postprocessor"]
+        N -->|Clean English Subtitles| F
     end
 
     subgraph "Interactive 3D Viewport"
-        A -->|Raycast Click| H["🎨 Three.js MMD 3D Model (Firefly)"]
-        H -->|Touch Zone Raycast| I{"Hit Zone Check"}
-        I -->|Head Pat: y >= 1.35| J["😳 Blush Texture & Sparkles + Voice"]
-        I -->|Ribbon: 1.08 <= y < 1.35| K["😮 Surprised Facial Blendshape + Voice"]
-        J --> H
-        K --> H
+        F -->|Raycast Click| O["🎨 Three.js MMD 3D Model (Firefly)"]
+        O -->|Touch Zone Raycast| P{"Hit Zone Check"}
+        P -->|Head Pat: y >= 1.35| Q["😳 Blush Texture & Sparkles + Voice"]
+        P -->|Ribbon: 1.08 <= y < 1.35| R["😮 Surprised Blendshape + Voice"]
+        Q --> O
+        R --> O
     end
 ```
 
@@ -39,36 +49,59 @@ graph TD
 
 ## 2. Core Workflows
 
-### Workflow 1: Dual-Language Chat & Voice Synthesis Pipeline
+### Workflow 1: Dynamic User Name & Honorific Dubbing Pipeline
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User
-    participant UI as Chat UI Overlay
-    participant LLM as LM Studio (Local LLM)
-    participant TTS as VOICEVOX Server
-    participant WebAudio as Web Audio Player
-    participant Trans as Reverse Translator (JA -> EN)
+    participant UI as Chat Overlay & State
+    participant Honorific as Honorific Resolver
+    participant LLM as DeepSeek / LM Studio API
+    participant TTS as VOICEVOX TTS Engine
+    participant WebAudio as Web Audio API Player
 
-    User->>UI: Types English Message & Hits Send
-    UI->>LLM: Send Conversation History (Japanese System Prompt)
-    LLM-->>UI: Streams Native Japanese Anime Text ("おはよう、トレイルブレイザー！")
+    User->>UI: Types Message & Clicks Send
+    UI->>Honorific: Resolve User Profile (nickname & gender)
+    Honorific-->>UI: Formats Name + Honorific ("Yokoyama-san" / "Yokoyama-chan")
+    UI->>LLM: Send Conversation + System Directive (Address user as "Yokoyama-san")
+    LLM-->>UI: Streams Japanese Speech ("おはよう、Yokoyama-san！")
     
     par Instant Voice Synthesis
-        UI->>TTS: POST /audio_query & /synthesis (Speaker ID 0: Shikikoku Metan Ama-ama)
-        TTS-->>WebAudio: Returns WAV Audio Blob (0ms Translation Delay)
+        UI->>TTS: Preprocess "-san" to "さん" & Send to VOICEVOX (audio_query)
+        TTS-->>WebAudio: Returns Clean WAV Audio Stream (0ms "no San" Artifacts)
         WebAudio->>User: Plays Authentic Japanese Anime Voice Dubbing
-    and Async Subtitle Formatting
-        UI->>Trans: Translate Japanese to English
-        Trans-->>UI: Returns Clean English Text ("Good morning, Trailblazer!")
-        UI->>User: Displays Clean English Subtitle on Chat Overlay
+    and Async Subtitle Translation
+        UI->>UI: Format Clean Subtitles ("Good morning, Yokoyama-san!")
     end
 ```
 
 ---
 
-### Workflow 2: 3D Raycasting Touch & Head Pat Interaction
+### Workflow 2: Google OAuth 2.0 Auth Gate & Onboarding Setup
+
+```mermaid
+flowchart TD
+    A["User Opens Viera App"] --> B{"Check LocalStorage ('viera_auth_user')"}
+    
+    B -->|No Auth Token| C["Display Google OAuth Login Gate Modal"]
+    C -->|Click 'Sign in with Google'| D["Google Identity Services (GIS SDK) Popup"]
+    D -->|Returns Credential JWT| E["Decode JWT Payload (email, name, picture)"]
+    
+    E --> F{"Check if Profile Complete ('isSetupComplete')"}
+    F -->|No| G["Display 'Complete Your Setup' Modal (c.ai style)"]
+    G --> H["1. User inputs @username handle (3-20 chars)"]
+    G --> I["2. User inputs Display Name"]
+    G --> J["3. User chooses Gender & uploads optional Avatar"]
+    J --> K["Save Complete Profile & Unlock Main Dashboard"]
+    
+    B -->|Auth Valid| K
+    F -->|Yes| K
+```
+
+---
+
+### Workflow 3: 3D Raycasting Touch & Head Pat Interaction
 
 ```mermaid
 flowchart TD
@@ -95,16 +128,21 @@ flowchart TD
 
 | Component | Responsibility | Key File |
 | :--- | :--- | :--- |
-| **`App.tsx`** | Central state orchestrator, chat state management, and stream handling. | [`src/App.tsx`](src/App.tsx) |
+| **`App.tsx`** | Central state orchestrator, auth session gate, history sync, and stream handling. | [`src/App.tsx`](src/App.tsx) |
+| **`authService.ts`** | Google OAuth GIS SDK payload decoding and LocalStorage auth session persistence. | [`src/services/authService.ts`](src/services/authService.ts) |
+| **`historyService.ts`** | Scoped multi-session CRUD in LocalStorage per user, auto-titling, and active session tracking. | [`src/services/historyService.ts`](src/services/historyService.ts) |
+| **`aiService.ts`** | LLM API streaming, dynamic user honorific resolution (`getUserFormattedName`), and system directives. | [`src/services/aiService.ts`](src/services/aiService.ts) |
+| **`ttsService.ts`** | VOICEVOX API integration, Hiragana honorific pre-processing (`-san` $\rightarrow$ `さん`), and Web Audio DSP. | [`src/services/ttsService.ts`](src/services/ttsService.ts) |
+| **`SetupOnboardingModal.tsx`** | Onboarding profile setup modal with c.ai floating input groups and custom glass gender dropdown. | [`src/components/ui/SetupOnboardingModal.tsx`](src/components/ui/SetupOnboardingModal.tsx) |
+| **`ConversationHistoryModal.tsx`** | Project Airi concept multi-session history modal with top `+ New` button and inline rename. | [`src/components/ui/ConversationHistoryModal.tsx`](src/components/ui/ConversationHistoryModal.tsx) |
+| **`UserProfileModal.tsx`** | c.ai style profile view/edit modal with avatar upload, gender selector, and clean empty bio state. | [`src/components/ui/UserProfileModal.tsx`](src/components/ui/UserProfileModal.tsx) |
 | **`Scene.tsx`** | Three.js 3D canvas viewport, MMD model loader, blush textures, and Raycasting touch handlers. | [`src/components/3d/Scene.tsx`](src/components/3d/Scene.tsx) |
-| **`ttsService.ts`** | VOICEVOX API integration, audio query modulation, and reverse translation bridge. | [`src/services/ttsService.ts`](src/services/ttsService.ts) |
-| **`SettingsModal.tsx`** | User configuration for AI providers, VOICEVOX character selection, and server URLs. | [`src/components/ui/SettingsModal.tsx`](src/components/ui/SettingsModal.tsx) |
-| **`personas.ts`** | Firefly character definitions, system prompts, and native anime Japanese roleplay rules. | [`src/data/personas.ts`](src/data/personas.ts) |
 
 ---
 
 ## Summary for Reviewers
 
-Viera operates on a **Dual-Channel Processing Model**:
-- **Audio Channel**: Direct native Japanese streaming from LLM to local VOICEVOX engine for 0ms voice synthesis latency.
-- **Visual UI Channel**: Clean English subtitle formatting and 60 FPS Three.js 3D touch interactions for a rich, responsive anime companion experience.
+Viera operates on a **Multi-Layered Interactive Architecture**:
+- **Authentication & Onboarding Gate**: Ensures secure Google OAuth login and personalized user setup before accessing Viera.
+- **Dynamic Honorific Address Layer**: Automatically addresses the user by their Display Name with gender-aware Japanese honorifics (`-san` / `-chan`).
+- **Dual-Channel Processing Model**: Instant VOICEVOX Japanese speech synthesis + clean English subtitle formatting and 60 FPS Three.js 3D touch interactions.
