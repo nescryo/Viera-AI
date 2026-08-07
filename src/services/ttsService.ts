@@ -229,6 +229,15 @@ class TTSService {
   private normalizeJapaneseSentenceFlow(jaText: string): string {
     let result = jaText.trim();
 
+    // 0. Convert Latin honorific suffixes (Name-san, Name-chan, Name-kun) to authentic Japanese Hiragana
+    result = result
+      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)-chan\b/gi, '$1ちゃん')
+      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)-san\b/gi, '$1さん')
+      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)-kun\b/gi, '$1くん')
+      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)-sama\b/gi, '$1さま')
+      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)\s+no\s+(?:san|San)\b/gi, '$1さん')
+      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)\s+no\s+(?:chan|Chan)\b/gi, '$1ちゃん');
+
     // 1. Normalize ASCII punctuation marks to authentic Japanese punctuation
     result = result
       .replace(/,/g, '、')
@@ -533,6 +542,13 @@ class TTSService {
           const doc = new DOMParser().parseFromString(rawText, 'text/html');
           enResult = doc.documentElement.textContent || rawText;
         }
+
+        // Post-process MyMemory honorific translation artifacts (e.g. "Yokoyama of San" / "Yokoyama's Chan" -> "Yokoyama-san" / "Yokoyama-chan")
+        enResult = enResult
+          .replace(/\b([A-Za-z0-9_]+) (?:of|'s|no) (?:San|san)\b/gi, '$1-san')
+          .replace(/\b([A-Za-z0-9_]+) (?:of|'s|no) (?:Chan|chan)\b/gi, '$1-chan')
+          .replace(/\b([A-Za-z0-9_]+)-(?:no|of)-(?:San|san)\b/gi, '$1-san')
+          .replace(/\b([A-Za-z0-9_]+)-(?:no|of)-(?:Chan|chan)\b/gi, '$1-chan');
         
         // Cache the English translation back to the original Japanese text!
         if (enResult && !enResult.includes('MYMEMORY WARNING')) {
