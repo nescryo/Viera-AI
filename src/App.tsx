@@ -327,7 +327,8 @@ export function App() {
         }
         console.error("Streaming error:", err);
         setIsLoading(false);
-      }
+      },
+      userProfile
     );
   };
 
@@ -479,7 +480,8 @@ export function App() {
         }
         console.error("Streaming error:", err);
         setIsLoading(false);
-      }
+      },
+      userProfile
     );
   };
 

@@ -1,4 +1,4 @@
-import type { ApiConfig, ChatMessage, Persona } from '../types';
+import type { ApiConfig, ChatMessage, Persona, UserProfile } from '../types';
 
 export function parseResponseText(text: string) {
   const emotionRegex = /\[(.*?)\]/g;
@@ -15,6 +15,31 @@ export function parseResponseText(text: string) {
   }
 
   return { emotions, actions };
+}
+
+/**
+ * Formats user's display name and honorific based on profile & gender preferences:
+ * - male -> "-san" (e.g. Yokoyama-san)
+ * - female -> "-chan" (e.g. Yokoyama-chan)
+ * - non-binary / unspecified / fallback -> "-san" (e.g. Yokoyama-san or Trailblazer-san)
+ */
+export function getUserFormattedName(userProfile?: Partial<UserProfile> | null): string {
+  const rawName = userProfile?.nickname?.trim() || userProfile?.username?.replace(/^@/, '').trim();
+  const baseName = rawName && rawName.length > 0 ? rawName : 'Trailblazer';
+  const gender = userProfile?.gender || 'unspecified';
+
+  if (gender === 'female') {
+    return `${baseName}-chan`;
+  }
+  return `${baseName}-san`;
+}
+
+/**
+ * Returns persona greeting customized with user's formatted name
+ */
+export function getPersonaGreeting(persona: Persona, userProfile?: Partial<UserProfile> | null): string {
+  const formattedName = getUserFormattedName(userProfile);
+  return persona.greeting.replace(/Trailblazer/g, formattedName);
 }
 
 /**
@@ -102,8 +127,11 @@ export async function sendStreamingChatMessage(
   apiConfig: ApiConfig,
   onToken: (token: string, fullTextSoFar: string) => void,
   onComplete: (fullText: string, emotions: string[], actions: string[]) => void,
-  _onError: (err: any) => void
+  _onError: (err: any) => void,
+  userProfile?: UserProfile | null
 ): Promise<void> {
+  const formattedUserName = getUserFormattedName(userProfile);
+
   const formattedHistory = messages.map(m => ({
     role: m.sender === 'user' ? 'user' : 'assistant',
     content: m.text
@@ -111,14 +139,21 @@ export async function sendStreamingChatMessage(
 
   const systemMessage = {
     role: 'system',
-    content: `${persona.systemPrompt}\n\nMaintain character at all times. Use asterisks for actions like *smiles* or *gestures*, and use emotion tags like [happy], [blush], [blush-hardly], [teasing], [jealous], [terrified], [pouting], [relaxed], [surprised], [angry], or [sad] when appropriate.`
+    content: `${persona.systemPrompt}
+
+USER ADDRESS & HONORIFIC DIRECTIVE:
+- The user you are conversing with is named "${formattedUserName}".
+- ALWAYS address the user directly as "${formattedUserName}" (e.g., "${formattedUserName}") in all your responses.
+- DO NOT call the user "Trailblazer" unless their display name is literally Trailblazer. Always use "${formattedUserName}".
+
+Maintain character at all times. Use asterisks for actions like *smiles* or *gestures*, and use emotion tags like [happy], [blush], [blush-hardly], [teasing], [jealous], [terrified], [pouting], [relaxed], [surprised], [angry], or [sad] when appropriate.`
   };
 
   if (apiConfig.provider === 'deepseek') {
     const apiKey = apiConfig.deepseekApiKey || import.meta.env.VITE_DEEPSEEK_API_KEY || '';
     if (!apiKey) {
       console.warn("DeepSeek API Key missing. Falling back to dynamic roleplay engine...");
-      simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete);
+      simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete, userProfile);
       return;
     }
 
@@ -161,7 +196,7 @@ export async function sendStreamingChatMessage(
     } catch (err) {
       clearTimeout(timeoutId);
       console.warn("DeepSeek API streaming failed. Falling back to dynamic roleplay engine:", err);
-      simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete);
+      simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete, userProfile);
       return;
     }
   }
@@ -195,13 +230,13 @@ export async function sendStreamingChatMessage(
       return;
     } catch (err) {
       clearTimeout(timeoutId);
-      console.warn("LM Studio connection failed (server offline or port 1234 not listening). Falling back to dynamic roleplay engine:", err);
-      simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete);
+      console.warn("LM Studio connection failed. Falling back to dynamic roleplay engine:", err);
+      simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete, userProfile);
       return;
     }
   }
 
-  simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete);
+  simulateFallbackStreaming(messages[messages.length - 1]?.text || '', onToken, onComplete, userProfile);
 }
 
 /**
@@ -210,9 +245,10 @@ export async function sendStreamingChatMessage(
 function simulateFallbackStreaming(
   lastUserText: string,
   onToken: (token: string, fullTextSoFar: string) => void,
-  onComplete: (fullText: string, emotions: string[], actions: string[]) => void
+  onComplete: (fullText: string, emotions: string[], actions: string[]) => void,
+  userProfile?: UserProfile | null
 ) {
-  const responseText = generateMockRoleplayResponse(lastUserText);
+  const responseText = generateMockRoleplayResponse(lastUserText, userProfile);
   let currentPos = 0;
   let accumulated = '';
 
@@ -231,73 +267,74 @@ function simulateFallbackStreaming(
   }, 25);
 }
 
-export function generateMockRoleplayResponse(lastUserText: string): string {
+export function generateMockRoleplayResponse(lastUserText: string, userProfile?: Partial<UserProfile> | null): string {
+  const userAddress = getUserFormattedName(userProfile);
   const lower = lastUserText.toLowerCase().trim();
 
   // Extreme Blush / Love Confession -> [blush-hardly]
   if (lower.includes('aku cinta kamu') || lower.includes('i love you') || lower.includes('cinta kamu') || lower.includes('nikah') || lower.includes('marry me')) {
-    return "*face turns bright crimson up to her ears, covering her blushing face with trembling hands* [blush-hardly] W-WHAT?! C-Cinta?! T-Trailblazer... how could you say something so incredibly embarrassing with a straight face?! My heart is beating so fast it feels like it's going to explode...!";
+    return `*face turns bright crimson up to her ears, covering her blushing face with trembling hands* [blush-hardly] W-WHAT?! C-Cinta?! ${userAddress}... how could you say something so incredibly embarrassing with a straight face?! My heart is beating so fast it feels like it's going to explode...!`;
   }
 
   // Jealousy -> [jealous]
   if (lower.includes('cewek lain') || lower.includes('wanita lain') || lower.includes('other girl') || lower.includes('march 7th') || lower.includes('kafka') || lower.includes('sparkle')) {
-    return "*pouts deeply with narrowed jealous eyes, turning her head away* [jealous] Hmph! Why are you bringing up other girls in front of me, Trailblazer? Are they more important to you than me...? I'm not talking to you right now!";
+    return `*pouts deeply with narrowed jealous eyes, turning her head away* [jealous] Hmph! Why are you bringing up other girls in front of me, ${userAddress}? Are they more important to you than me...? I'm not talking to you right now!`;
   }
 
   // Terrified -> [terrified]
   if (lower.includes('hantu') || lower.includes('takut') || lower.includes('ghost') || lower.includes('scary') || lower.includes('monster') || lower.includes('seram')) {
-    return "*hugs herself tightly trembling with terrified wide eyes* [terrified] E-Eeeek! P-Please don't scare me like that, Trailblazer! Is there really something spooky behind us?! Protect me, please...!";
+    return `*hugs herself tightly trembling with terrified wide eyes* [terrified] E-Eeeek! P-Please don't scare me like that, ${userAddress}! Is there really something spooky behind us?! Protect me, please...!`;
   }
 
   // Teasing -> [teasing]
   if (lower.includes('goda') || lower.includes('tease') || lower.includes('jahil') || lower.includes('lucu') || lower.includes('playful')) {
-    return "*smirks playfully with a mischievous wink* [teasing] Ehe~ Are you trying to tease me, Trailblazer? Or maybe... you just can't take your eyes off me? Who's teasing who now~?";
+    return `*smirks playfully with a mischievous wink* [teasing] Ehe~ Are you trying to tease me, ${userAddress}? Or maybe... you just can't take your eyes off me? Who's teasing who now~?`;
   }
 
   // Pouting -> [pouting]
   if (lower.includes('cemberut') || lower.includes('pout') || lower.includes('sulking') || lower.includes('ngambek')) {
-    return "*puffs her cheeks out in an adorable pout* [pouting] I'm not ngambek! I'm just... slightly unamused by your behavior right now! You better buy me a sweet cake to make up for it!";
+    return `*puffs her cheeks out in an adorable pout* [pouting] I'm not ngambek! I'm just... slightly unamused by your behavior right now, ${userAddress}! You better buy me a sweet cake to make up for it!`;
   }
 
   // Smug / Teasing
   if (lower.includes('hebat') || lower.includes('pintar') || lower.includes('smart') || lower.includes('pro') || lower.includes('menang')) {
-    return "*tilts her chin up playfully with a mischievous smirk* [teasing] Hehe~ Of course! Did you really doubt me, Trailblazer? You should praise me more~!";
+    return `*tilts her chin up playfully with a mischievous smirk* [teasing] Hehe~ Of course! Did you really doubt me, ${userAddress}? You should praise me more~!`;
   }
 
   // Short questions like "kenapa", "what", "why"
   if (lower === 'kenapa' || lower === 'why' || lower === 'what' || lower === 'apa') {
-    return "*menatapmu bingung dengan mata membulat* [surprised] Eh? Kenapa? Ada apa Trailblazer? Apa ada sesuatu yang menganggumu? Ceritakan padaku!";
+    return `*menatapmu bingung dengan mata membulat* [surprised] Eh? Kenapa? Ada apa ${userAddress}? Apa ada sesuatu yang menganggumu? Ceritakan padaku!`;
   }
 
   // Greetings
   if (lower.includes('halo') || lower.includes('hai') || lower.includes('apa kabar') || lower.includes('pagi') || lower.includes('lagi apa')) {
-    return "*tersenyum manis dan melambaikan tangan kecilnya* [happy] Selamat pagi, Trailblazer! Aku senang sekali bisa menyapamu lagi. Hari ini kamu mau jalan-jalan ke Secret Base-ku di Penacony sambil makan kue yang manis?";
+    return `*tersenyum manis dan melambaikan tangan kecilnya* [happy] Selamat pagi, ${userAddress}! Aku senang sekali bisa menyapamu lagi. Hari ini kamu mau jalan-jalan ke Secret Base-ku di Penacony sambil makan kue yang manis?`;
   }
 
   if (lower.includes('hello') || lower.includes('hi') || lower.includes('morning') || lower.includes('how are you')) {
-    return "*smiles warmly with gentle eyes, waving slightly* [happy] Good morning, Trailblazer! I'm so happy to see you today. Have you had anything sweet to eat yet? Let's spend another wonderful day together!";
+    return `*smiles warmly with gentle eyes, waving slightly* [happy] Good morning, ${userAddress}! I'm so happy to see you today. Have you had anything sweet to eat yet? Let's spend another wonderful day together!`;
   }
 
   // Compliments -> standard blush
   if (lower.includes('cantik') || lower.includes('imut') || lower.includes('suka') || lower.includes('love') || lower.includes('cute')) {
-    return "*cheeks blush soft rose and looks down timidly* [blush] E-Ehh?! Why are you saying that so suddenly... You make my heart flutter so fast, Trailblazer...";
+    return `*cheeks blush soft rose and looks down timidly* [blush] E-Ehh?! Why are you saying that so suddenly... You make my heart flutter so fast, ${userAddress}...`;
   }
 
   // Anger
   if (lower.includes('marah') || lower.includes('kesal') || lower.includes('angry')) {
-    return "*pouts her lips slightly and glares* [angry] Hmph! You're making me a little upset, you know! But... I can never stay truly angry at you...";
+    return `*pouts her lips slightly and glares* [angry] Hmph! You're making me a little upset, ${userAddress}! But... I can never stay truly angry at you...`;
   }
 
   // Sadness
   if (lower.includes('sedih') || lower.includes('maaf') || lower.includes('sad') || lower.includes('sorry')) {
-    return "*looks at you with gentle, worried eyes* [sad] Please don't be sad... Whatever happens, I will always stay by your side to protect you!";
+    return `*looks at you with gentle, worried eyes* [sad] Please don't be sad, ${userAddress}... Whatever happens, I will always stay by your side to protect you!`;
   }
 
   // Dynamic fallback variations to avoid rigid repetition
   const dynamicFallbacks = [
-    `*smiles softly looking at you* [relaxed] Regarding "${lastUserText}", I understand... Being by your side always makes my heart feel so warm and peaceful, Trailblazer.`,
-    `*tilts her head slightly* [surprised] Oh, about "${lastUserText}"? I'm listening to everything you say carefully, Trailblazer! Is there anything else on your mind?`,
-    `*nods gently with a sweet smile* [happy] I always love hearing you talk about "${lastUserText}". Let's spend more quality time together today!`
+    `*smiles softly looking at you* [relaxed] Regarding "${lastUserText}", I understand... Being by your side always makes my heart feel so warm and peaceful, ${userAddress}.`,
+    `*tilts her head slightly* [surprised] Oh, about "${lastUserText}"? I'm listening to everything you say carefully, ${userAddress}! Is there anything else on your mind?`,
+    `*nods gently with a sweet smile* [happy] I always love hearing you talk about "${lastUserText}". Let's spend more quality time together today, ${userAddress}!`
   ];
 
   const randomIndex = Math.floor(Math.random() * dynamicFallbacks.length);
