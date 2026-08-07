@@ -72,3 +72,26 @@ export interface VoicevoxSpeaker {
   styles: VoicevoxStyle[];
   version?: string;
 }
+
+export interface UserProfile {
+  id: string;               // Google sub ID
+  email: string;            // Google email address
+  username: string;         // Unique handle (@username)
+  nickname: string;         // Display name
+  picture: string;          // Avatar URL
+  gender?: 'male' | 'female' | 'non-binary' | 'unspecified';
+  bio?: string;
+  isSetupComplete: boolean; // Discord onboarding flag
+  createdAt: number;
+}
+
+export interface ChatSession {
+  id: string;               // Session UUID / Timestamp
+  title: string;            // Conversation Title
+  characterId: string;      // Character ID ('firefly')
+  provider: ApiProvider;    // Active LLM provider
+  createdAt: number;
+  updatedAt: number;
+  messages: ChatMessage[];
+}
+

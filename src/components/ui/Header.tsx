@@ -1,20 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import type { Persona, ApiConfig } from '../../types';
-import { Settings, Sparkles, Upload, Circle } from 'lucide-react';
+import type { Persona, ApiConfig, UserProfile } from '../../types';
+import { Settings, Sparkles, Upload, Circle, MessageSquare, User } from 'lucide-react';
 import { checkLmStudioConnection } from '../../services/aiService';
 
 interface HeaderProps {
   currentPersona: Persona;
   onOpenSettings: () => void;
   onOpenModelUploader: () => void;
+  onOpenHistory: () => void;
+  onOpenProfile: () => void;
   apiConfig: ApiConfig;
+  userProfile: UserProfile | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currentPersona,
   onOpenSettings,
   onOpenModelUploader,
-  apiConfig
+  onOpenHistory,
+  onOpenProfile,
+  apiConfig,
+  userProfile
 }) => {
   const [isLmStudioOnline, setIsLmStudioOnline] = useState<boolean>(false);
 
@@ -61,7 +67,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Right: 3D Model Loader & Settings */}
+      {/* Right: 3D Model Loader, History, Settings & Profile */}
       <div className="header-right">
         <div className={`provider-pill ${apiConfig.provider === 'deepseek' ? 'online' : isLmStudioOnline ? 'online' : 'offline'}`}>
           <span className={`provider-dot ${apiConfig.provider === 'deepseek' ? 'dot-online' : isLmStudioOnline ? 'dot-online' : 'dot-offline'}`} />
@@ -81,8 +87,23 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="btn-label-desktop">3D Model</span>
         </button>
 
+        {/* 1. Conversation History Icon (Left of Settings) */}
+        <button className="icon-btn history-btn" onClick={onOpenHistory} title="Conversations History">
+          <MessageSquare size={18} />
+        </button>
+
+        {/* 2. Settings Icon */}
         <button className="icon-btn settings-btn" onClick={onOpenSettings} title="Settings & API">
           <Settings size={18} />
+        </button>
+
+        {/* 3. User Profile Avatar Icon (Right of Settings) */}
+        <button className="icon-btn profile-avatar-btn" onClick={onOpenProfile} title="Profile & Account">
+          {userProfile?.picture ? (
+            <img src={userProfile.picture} alt={userProfile.nickname || 'Profile'} className="header-user-avatar" />
+          ) : (
+            <User size={18} />
+          )}
         </button>
       </div>
     </header>

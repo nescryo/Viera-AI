@@ -1,13 +1,19 @@
-import { useState, useCallback } from 'react';
-import type { ChatMessage, Persona, ApiConfig } from './types';
+import { useState, useCallback, useEffect } from 'react';
+import type { ChatMessage, Persona, ApiConfig, UserProfile, ChatSession } from './types';
 import { FIREFLY_PERSONA } from './data/personas';
 import { sendStreamingChatMessage, parseResponseText } from './services/aiService';
 import { ttsService } from './services/ttsService';
+import { getCurrentUser, saveCurrentUser, logoutUser } from './services/authService';
+import * as historyService from './services/historyService';
 
 import { Header } from './components/ui/Header';
 import { ChatOverlay } from './components/ui/ChatOverlay';
 import { SettingsModal } from './components/ui/SettingsModal';
 import { ModelUploaderModal } from './components/ui/ModelUploaderModal';
+import { LoginModal } from './components/ui/LoginModal';
+import { SetupOnboardingModal } from './components/ui/SetupOnboardingModal';
+import { ConversationHistoryModal } from './components/ui/ConversationHistoryModal';
+import { UserProfileModal } from './components/ui/UserProfileModal';
 import { Scene } from './components/3d/Scene';
 
 import './App.css';
@@ -15,15 +21,26 @@ import './App.css';
 export function App() {
   // Single dedicated 3D Roleplay Character: Firefly
   const [currentPersona] = useState<Persona>(FIREFLY_PERSONA);
+  
+  // User Authentication & Profile State
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => getCurrentUser());
+  const [pendingGooglePayload, setPendingGooglePayload] = useState<{ sub: string; email: string; name: string; picture: string } | null>(null);
+
+  // Multi-Session Chat History States
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [activeSpeakingId, setActiveSpeakingId] = useState<string | null>(null);
-  const [currentEmotion, setCurrentEmotion] = useState<string>('relaxed');
 
   // Modals state
   const [showSettings, setShowSettings] = useState(false);
   const [showUploader, setShowUploader] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [activeSpeakingId, setActiveSpeakingId] = useState<string | null>(null);
+  const [currentEmotion, setCurrentEmotion] = useState<string>('relaxed');
 
   // API Configuration (Auto-detects keys from .env or localStorage)
   const [apiConfig, setApiConfig] = useState<ApiConfig>(() => {
@@ -63,9 +80,132 @@ export function App() {
     };
   });
 
+  // Load Sessions when userProfile changes
+  useEffect(() => {
+    if (userProfile && userProfile.isSetupComplete) {
+      const userSessions = historyService.getSessions(userProfile.id);
+      let currentActiveId = historyService.getActiveSessionId(userProfile.id);
+
+      if (userSessions.length === 0) {
+        const newSess = historyService.createSession(userProfile.id, currentPersona.id, apiConfig.provider);
+        setSessions([newSess]);
+        setActiveSessionId(newSess.id);
+        setMessages([]);
+      } else {
+        setSessions(userSessions);
+        if (!currentActiveId || !userSessions.some((s) => s.id === currentActiveId)) {
+          currentActiveId = userSessions[0].id;
+          historyService.setActiveSessionId(userProfile.id, currentActiveId);
+        }
+        setActiveSessionId(currentActiveId);
+        const activeSess = userSessions.find((s) => s.id === currentActiveId);
+        setMessages(activeSess ? activeSess.messages : []);
+      }
+    } else {
+      setSessions([]);
+      setActiveSessionId(null);
+      setMessages([]);
+    }
+  }, [userProfile]);
+
+  // Sync messages change back to active session storage
+  const syncMessagesToSession = (newMessages: ChatMessage[]) => {
+    setMessages(newMessages);
+    if (userProfile && activeSessionId) {
+      const updatedSess = historyService.updateSessionMessages(userProfile.id, activeSessionId, newMessages);
+      if (updatedSess) {
+        setSessions((prev) => prev.map((s) => (s.id === activeSessionId ? updatedSess : s)));
+      }
+    }
+  };
+
   const handleSaveConfig = (newConfig: ApiConfig) => {
     setApiConfig(newConfig);
     localStorage.setItem('viera_api_config', JSON.stringify(newConfig));
+  };
+
+  // Google OAuth Handlers
+  const handleGoogleLoginSuccess = (payload: { sub: string; email: string; name: string; picture: string }) => {
+    const existing = getCurrentUser();
+    if (existing && existing.id === payload.sub && existing.isSetupComplete) {
+      setUserProfile(existing);
+      setPendingGooglePayload(null);
+    } else {
+      // Trigger Onboarding Setup
+      setPendingGooglePayload(payload);
+    }
+  };
+
+  const handleCompleteSetup = (completedProfile: UserProfile) => {
+    saveCurrentUser(completedProfile);
+    setUserProfile(completedProfile);
+    setPendingGooglePayload(null);
+  };
+
+  const handleUpdateProfile = (updated: UserProfile) => {
+    saveCurrentUser(updated);
+    setUserProfile(updated);
+  };
+
+  const handleLogout = () => {
+    logoutUser();
+    setUserProfile(null);
+    setPendingGooglePayload(null);
+    setShowProfile(false);
+    setShowHistory(false);
+  };
+
+  // Multi-session Handlers
+  const handleSelectSession = (sessionId: string) => {
+    if (!userProfile) return;
+    historyService.setActiveSessionId(userProfile.id, sessionId);
+    setActiveSessionId(sessionId);
+
+    const target = sessions.find((s) => s.id === sessionId);
+    setMessages(target ? target.messages : []);
+    setShowHistory(false); // Auto-close history modal on selection!
+  };
+
+  const handleCreateNewChat = () => {
+    if (!userProfile) return;
+    const newSess = historyService.createSession(userProfile.id, currentPersona.id, apiConfig.provider);
+    const updatedSessions = historyService.getSessions(userProfile.id);
+    setSessions(updatedSessions);
+    setActiveSessionId(newSess.id);
+    setMessages([]);
+    setShowHistory(false); // Auto-close history modal!
+  };
+
+  const handleRenameSession = (sessionId: string, newTitle: string) => {
+    if (!userProfile) return;
+    historyService.updateSessionTitle(userProfile.id, sessionId, newTitle);
+    setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, title: newTitle } : s)));
+  };
+
+  const handleDeleteSession = (sessionId: string) => {
+    if (!userProfile) return;
+    const remaining = historyService.deleteSession(userProfile.id, sessionId);
+    setSessions(remaining);
+
+    if (remaining.length === 0) {
+      const newSess = historyService.createSession(userProfile.id, currentPersona.id, apiConfig.provider);
+      setSessions([newSess]);
+      setActiveSessionId(newSess.id);
+      setMessages([]);
+    } else if (activeSessionId === sessionId) {
+      const nextActive = remaining[0];
+      setActiveSessionId(nextActive.id);
+      setMessages(nextActive.messages);
+    }
+  };
+
+  const handleClearAllSessions = () => {
+    if (!userProfile) return;
+    historyService.clearAllSessions(userProfile.id);
+    const newSess = historyService.createSession(userProfile.id, currentPersona.id, apiConfig.provider);
+    setSessions([newSess]);
+    setActiveSessionId(newSess.id);
+    setMessages([]);
   };
 
   const handleSendMessage = async (text: string) => {
@@ -78,7 +218,7 @@ export function App() {
     };
 
     const updatedMessages = [...messages, userMsg];
-    setMessages(updatedMessages);
+    syncMessagesToSession(updatedMessages);
     setIsLoading(true);
 
     const aiMsgId = (Date.now() + 1).toString();
@@ -92,7 +232,8 @@ export function App() {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    setMessages((prev) => [...prev, placeholderAiMsg]);
+    const messagesWithPlaceholder = [...updatedMessages, placeholderAiMsg];
+    syncMessagesToSession(messagesWithPlaceholder);
 
     let updateFrameId: number | null = null;
     let latestText = '';
@@ -105,24 +246,26 @@ export function App() {
         latestText = fullTextSoFar;
         const { emotions } = parseResponseText(fullTextSoFar);
         
-        // Auto-trigger 3D facial blendshapes in real-time as emotion tags arrive!
         if (emotions.length > 0) {
           const activeEmotion = emotions[emotions.length - 1];
           setCurrentEmotion(activeEmotion);
         }
 
-        // Stage 3.1.3: Throttle React state re-renders to 60 FPS (1 frame per rAF) to eliminate 3D viewport stutter
         if (!updateFrameId) {
           updateFrameId = requestAnimationFrame(() => {
             updateFrameId = null;
             const { emotions: currEmotions, actions: currActions } = parseResponseText(latestText);
-            setMessages((prev) =>
-              prev.map((msg) =>
+            setMessages((prev) => {
+              const next = prev.map((msg) =>
                 msg.id === aiMsgId
                   ? { ...msg, text: latestText, emotions: currEmotions, actions: currActions }
                   : msg
-              )
-            );
+              );
+              if (userProfile && activeSessionId) {
+                historyService.updateSessionMessages(userProfile.id, activeSessionId, next);
+              }
+              return next;
+            });
           });
         }
       },
@@ -146,13 +289,16 @@ export function App() {
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
 
-        setMessages((prev) =>
-          prev.map((msg) => (msg.id === aiMsgId ? finalMsg : msg))
-        );
+        setMessages((prev) => {
+          const next = prev.map((msg) => (msg.id === aiMsgId ? finalMsg : msg));
+          if (userProfile && activeSessionId) {
+            historyService.updateSessionMessages(userProfile.id, activeSessionId, next);
+          }
+          return next;
+        });
 
         speakMessage(finalMsg);
 
-        // Async Reverse Translation: Display ONLY English Translated Text on Chat Screen!
         if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(fullText)) {
           ttsService.translateJapaneseToEnglish(fullText).then((enSub) => {
             if (enSub && enSub !== fullText) {
@@ -161,11 +307,15 @@ export function App() {
               const actionPrefix = currActions.length > 0 ? `*${currActions[0]}* ` : '';
               const englishOnlyText = `${emotionPrefix}${actionPrefix}${enSub}`;
 
-              setMessages((prev) =>
-                prev.map((msg) =>
+              setMessages((prev) => {
+                const next = prev.map((msg) =>
                   msg.id === aiMsgId ? { ...msg, text: englishOnlyText, originalText: fullText } : msg
-                )
-              );
+                );
+                if (userProfile && activeSessionId) {
+                  historyService.updateSessionMessages(userProfile.id, activeSessionId, next);
+                }
+                return next;
+              });
             }
           });
         }
@@ -209,7 +359,6 @@ export function App() {
   const handleRegenerateResponse = () => {
     if (messages.length === 0 || isLoading) return;
     
-    // Find index of the last user message
     let lastUserIndex = -1;
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].sender === 'user') {
@@ -220,9 +369,8 @@ export function App() {
 
     if (lastUserIndex === -1) return;
 
-    // Prune everything after the last user message
     const trimmedHistory = messages.slice(0, lastUserIndex + 1);
-    setMessages(trimmedHistory);
+    syncMessagesToSession(trimmedHistory);
     setIsLoading(true);
 
     const aiMsgId = (Date.now() + 1).toString();
@@ -236,7 +384,8 @@ export function App() {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    setMessages([...trimmedHistory, placeholderAiMsg]);
+    const messagesWithPlaceholder = [...trimmedHistory, placeholderAiMsg];
+    syncMessagesToSession(messagesWithPlaceholder);
 
     let updateFrameId: number | null = null;
     let latestText = '';
@@ -258,13 +407,17 @@ export function App() {
           updateFrameId = requestAnimationFrame(() => {
             updateFrameId = null;
             const { emotions: currEmotions, actions: currActions } = parseResponseText(latestText);
-            setMessages((prev) =>
-              prev.map((msg) =>
+            setMessages((prev) => {
+              const next = prev.map((msg) =>
                 msg.id === aiMsgId
                   ? { ...msg, text: latestText, emotions: currEmotions, actions: currActions }
                   : msg
-              )
-            );
+              );
+              if (userProfile && activeSessionId) {
+                historyService.updateSessionMessages(userProfile.id, activeSessionId, next);
+              }
+              return next;
+            });
           });
         }
       },
@@ -288,9 +441,13 @@ export function App() {
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
 
-        setMessages((prev) =>
-          prev.map((msg) => (msg.id === aiMsgId ? finalMsg : msg))
-        );
+        setMessages((prev) => {
+          const next = prev.map((msg) => (msg.id === aiMsgId ? finalMsg : msg));
+          if (userProfile && activeSessionId) {
+            historyService.updateSessionMessages(userProfile.id, activeSessionId, next);
+          }
+          return next;
+        });
 
         speakMessage(finalMsg);
 
@@ -302,11 +459,15 @@ export function App() {
               const actionPrefix = currActions.length > 0 ? `*${currActions[0]}* ` : '';
               const englishOnlyText = `${emotionPrefix}${actionPrefix}${enSub}`;
 
-              setMessages((prev) =>
-                prev.map((msg) =>
+              setMessages((prev) => {
+                const next = prev.map((msg) =>
                   msg.id === aiMsgId ? { ...msg, text: englishOnlyText, originalText: fullText } : msg
-                )
-              );
+                );
+                if (userProfile && activeSessionId) {
+                  historyService.updateSessionMessages(userProfile.id, activeSessionId, next);
+                }
+                return next;
+              });
             }
           });
         }
@@ -340,7 +501,10 @@ export function App() {
         currentPersona={currentPersona}
         onOpenSettings={() => setShowSettings(true)}
         onOpenModelUploader={() => setShowUploader(true)}
+        onOpenHistory={() => setShowHistory(true)}
+        onOpenProfile={() => setShowProfile(true)}
         apiConfig={apiConfig}
+        userProfile={userProfile}
       />
 
       <ChatOverlay
@@ -355,6 +519,20 @@ export function App() {
         isLoading={isLoading}
       />
 
+      {/* 1. Google OAuth Auth Gate Modal */}
+      {!userProfile && !pendingGooglePayload && (
+        <LoginModal onGoogleLoginSuccess={handleGoogleLoginSuccess} />
+      )}
+
+      {/* 2. Discord-style "Complete Your Setup" Onboarding Modal */}
+      {pendingGooglePayload && (
+        <SetupOnboardingModal
+          initialProfile={pendingGooglePayload}
+          onCompleteSetup={handleCompleteSetup}
+        />
+      )}
+
+      {/* 3. Settings Modal */}
       {showSettings && (
         <SettingsModal
           apiConfig={apiConfig}
@@ -363,12 +541,37 @@ export function App() {
         />
       )}
 
+      {/* 4. Model Uploader Modal */}
       {showUploader && (
         <ModelUploaderModal
           onLoadModelFile={(file) => {
             console.log("Loaded custom 3D model file:", file.name);
           }}
           onClose={() => setShowUploader(false)}
+        />
+      )}
+
+      {/* 5. Project Airi Concept Conversation History Modal */}
+      {showHistory && (
+        <ConversationHistoryModal
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onSelectSession={handleSelectSession}
+          onCreateNewChat={handleCreateNewChat}
+          onRenameSession={handleRenameSession}
+          onDeleteSession={handleDeleteSession}
+          onClearAllSessions={handleClearAllSessions}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
+
+      {/* 6. Character.AI Concept User Profile Modal */}
+      {showProfile && userProfile && (
+        <UserProfileModal
+          userProfile={userProfile}
+          onUpdateProfile={handleUpdateProfile}
+          onLogout={handleLogout}
+          onClose={() => setShowProfile(false)}
         />
       )}
     </div>

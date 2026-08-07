@@ -563,6 +563,9 @@ export const Scene: React.FC<SceneProps> = React.memo(({
       updatePointerTracking(clientX, clientY);
     };
 
+    let chestTouchCount = 0;
+    let chestTouchResetTimer: ReturnType<typeof setTimeout> | null = null;
+
     const handlePointerClick = (clientX: number, clientY: number) => {
       if (isDisposed || !containerRef.current || !mmdMeshRef.current) return;
       updatePointerTracking(clientX, clientY);
@@ -581,12 +584,15 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 
         // Strict Head Pat Zone ONLY (Top of Head & Hair: y >= 1.35 and relX < 0.28)
         if (relX < 0.28 && hitPoint.y >= 1.35) {
+          chestTouchCount = 0; // Reset chest touch counter on head pat!
+          if (chestTouchResetTimer) clearTimeout(chestTouchResetTimer);
+
           currentEmotionRef.current = 'blush';
           onSelectEmotionRef.current?.('blush');
           headPatTiltTimer = 1.0;
           triggerSparkles(hitPoint);
 
-          const interjections = ["E-Eh??", "Hmmm...", "H-Huh...?"];
+          const interjections = ["えーっと、なに…？", "んんっ…恥ずかしいよ…", "えっ、なになに…？"];
           const pickedVoice = interjections[Math.floor(Math.random() * interjections.length)];
 
           ttsService.speak(
@@ -598,14 +604,41 @@ export const Scene: React.FC<SceneProps> = React.memo(({
             apiConfigRef.current
           );
         } 
-        // Strict Chest Ribbon Zone ONLY (Center Ribbon: 1.08 <= y < 1.35 and relX < 0.18)
+        // Strict Chest Zone (1.08 <= y < 1.35 and relX < 0.18)
         else if (relX < 0.18 && hitPoint.y >= 1.08 && hitPoint.y < 1.35) {
-          currentEmotionRef.current = 'surprised';
-          onSelectEmotionRef.current?.('surprised');
+          chestTouchCount += 1;
+
+          if (chestTouchResetTimer) clearTimeout(chestTouchResetTimer);
+          chestTouchResetTimer = setTimeout(() => {
+            chestTouchCount = 0;
+          }, 8000);
+
+          let targetEmotion = 'blush-hardly';
+          let voiceText = "ちょ、ちょっと…どこ触ってるの…？！";
+
+          if (chestTouchCount >= 6) {
+            // After 3 more touches (total 6+): Terrified (Japanese)
+            targetEmotion = 'terrified';
+            const lines = ["きゃあぁっ…！お、お願いだからやめてぇ…！", "う、うわぁぁん…！こわいよぉ…！", "た、助けてぇ…離れてぇ…！"];
+            voiceText = lines[Math.floor(Math.random() * lines.length)];
+          } else if (chestTouchCount >= 3) {
+            // After 3 consecutive touches: Pouting (Japanese)
+            targetEmotion = 'pouting';
+            const lines = ["むーっ！もう、いい加減にしてよっ！", "ふんっ！開拓者さんなんて、もう知らないっ！", "もうっ！おこるよっ…？！"];
+            voiceText = lines[Math.floor(Math.random() * lines.length)];
+          } else {
+            // Touches 1 - 2: Blush Hardly (Japanese)
+            targetEmotion = 'blush-hardly';
+            const lines = ["ちょ、ちょっと…どこ触ってるの…？！", "や、やだ…ダメだってば…！", "ひゃぁっ？！な、なにやってるの…？！"];
+            voiceText = lines[Math.floor(Math.random() * lines.length)];
+          }
+
+          currentEmotionRef.current = targetEmotion;
+          onSelectEmotionRef.current?.(targetEmotion);
           triggerSparkles(hitPoint);
 
           ttsService.speak(
-            "H-Huh...?",
+            voiceText,
             currentPersona,
             () => { isSpeakingRef.current = true; },
             () => { isSpeakingRef.current = false; },
