@@ -228,16 +228,7 @@ class TTSService {
 
   // Helper method for Point 2: Japanese Sentence Flow Normalization, Clause Breathing Punctuation & Dialogue Brackets
   private normalizeJapaneseSentenceFlow(jaText: string): string {
-    let result = jaText.trim();
-
-    // 0. Convert Latin honorific suffixes (Name-san, Name-chan, Name-kun) to authentic Japanese Hiragana
-    result = result
-      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)-chan\b/gi, '$1ちゃん')
-      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)-san\b/gi, '$1さん')
-      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)-kun\b/gi, '$1くん')
-      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)-sama\b/gi, '$1さま')
-      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)\s+no\s+(?:san|San)\b/gi, '$1さん')
-      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)\s+no\s+(?:chan|Chan)\b/gi, '$1ちゃん');
+    let result = this.sanitizeHonorificsForTTS(jaText.trim());
 
     // 1. Normalize ASCII punctuation marks to authentic Japanese punctuation
     result = result
@@ -368,8 +359,21 @@ class TTSService {
     this.synth.speak(utterance);
   }
 
+  public sanitizeHonorificsForTTS(text: string): string {
+    if (!text) return text;
+    return text
+      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)-chan\b/gi, '$1ちゃん')
+      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)-san\b/gi, '$1さん')
+      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)-kun\b/gi, '$1くん')
+      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)-sama\b/gi, '$1さま')
+      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)\s+no\s+(?:san|San)\b/gi, '$1さん')
+      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)\s+no\s+(?:chan|Chan)\b/gi, '$1ちゃん')
+      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)\s+(?:san|San)\b/gi, '$1さん')
+      .replace(/([A-Za-z0-9_\u3040-\u30ff\u4e00-\u9fff]+)\s+(?:chan|Chan)\b/gi, '$1ちゃん');
+  }
+
   private async translateToJapanese(text: string): Promise<string> {
-    let processedText = text.trim();
+    let processedText = this.sanitizeHonorificsForTTS(text.trim());
 
     // 1. Clean English letter stutter prefixes & normalize clipped Japanese hesitation fillers (e.g. "えっと" -> "えーっとね、")
     if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(processedText)) {

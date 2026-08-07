@@ -157,6 +157,9 @@ export const Scene: React.FC<SceneProps> = React.memo(({
   const upperBodyBoneRef = useRef<THREE.Bone | null>(null);
   const neckBoneRef = useRef<THREE.Bone | null>(null);
   const headBoneRef = useRef<THREE.Bone | null>(null);
+  const leftEyeBoneRef = useRef<THREE.Bone | null>(null);
+  const rightEyeBoneRef = useRef<THREE.Bone | null>(null);
+  const bothEyesBoneRef = useRef<THREE.Bone | null>(null);
   
   const hairBonesRef = useRef<{ bone: THREE.Bone; baseRotZ: number; baseRotX: number; phase: number }[]>([]);
   const skirtBonesRef = useRef<{ bone: THREE.Bone; baseRotZ: number; baseRotX: number; phase: number }[]>([]);
@@ -308,6 +311,17 @@ export const Scene: React.FC<SceneProps> = React.memo(({
               headBoneRef.current = bone;
             }
 
+            // Eye bone detection (excluding tip/end bones like 目先.L or 目先.R)
+            if (!name.includes('先') && !name.includes('tip') && !name.includes('end') && !name.includes('End')) {
+              if (name === '左目' || name === '目.L' || name === '目_L' || name === 'eye_L' || name === 'Eye_L') {
+                leftEyeBoneRef.current = bone;
+              } else if (name === '右目' || name === '目.R' || name === '目_R' || name === 'eye_R' || name === 'Eye_R') {
+                rightEyeBoneRef.current = bone;
+              } else if (name === '両目' || name === 'eyes' || name === 'Eyes') {
+                bothEyesBoneRef.current = bone;
+              }
+            }
+
             if (name.includes('髪') || name.includes('毛') || name.includes('hair') || name.includes('ツインテ') || name.includes('リボン')) {
               hairBonesRef.current.push({
                 bone,
@@ -329,6 +343,13 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           });
 
           mmdMesh.skeleton.update();
+
+          console.log('[Firefly Eye Tracking Debug]', {
+            leftEye: leftEyeBoneRef.current?.name || 'NULL',
+            rightEye: rightEyeBoneRef.current?.name || 'NULL',
+            bothEyes: bothEyesBoneRef.current?.name || 'NULL',
+            matchingBones: mmdMesh.skeleton.bones.map(b => b.name).filter(n => n.includes('目') || n.toLowerCase().includes('eye'))
+          });
         }
 
         // Clean and optimize materials
@@ -782,6 +803,29 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 
         headBoneRef.current.rotation.y += (((targetHeadYaw * 0.5) + extraHeadYaw) - headBoneRef.current.rotation.y) * 0.1;
         headBoneRef.current.rotation.x += (((targetHeadPitch * 0.5) + extraHeadPitch) - headBoneRef.current.rotation.x) * 0.1;
+      }
+
+      // Fast Lifelike Eye Tracking (Subtle, natural glance without creepy distortion)
+      const rawMouseX = pointerRef.current.targetX;
+      const rawMouseY = pointerRef.current.targetY;
+
+      // Natural eye glance angle (Subtle ±0.08 rad yaw / ±0.05 rad pitch)
+      const targetEyeYaw = rawMouseX * 0.08;
+      const targetEyePitch = -rawMouseY * 0.05;
+
+      const eyeLerpSpeed = 0.25;
+
+      if (leftEyeBoneRef.current) {
+        leftEyeBoneRef.current.rotation.y += (targetEyeYaw - leftEyeBoneRef.current.rotation.y) * eyeLerpSpeed;
+        leftEyeBoneRef.current.rotation.x += (targetEyePitch - leftEyeBoneRef.current.rotation.x) * eyeLerpSpeed;
+      }
+      if (rightEyeBoneRef.current) {
+        rightEyeBoneRef.current.rotation.y += (targetEyeYaw - rightEyeBoneRef.current.rotation.y) * eyeLerpSpeed;
+        rightEyeBoneRef.current.rotation.x += (targetEyePitch - rightEyeBoneRef.current.rotation.x) * eyeLerpSpeed;
+      }
+      if (bothEyesBoneRef.current && !leftEyeBoneRef.current && !rightEyeBoneRef.current) {
+        bothEyesBoneRef.current.rotation.y += (targetEyeYaw - bothEyesBoneRef.current.rotation.y) * eyeLerpSpeed;
+        bothEyesBoneRef.current.rotation.x += (targetEyePitch - bothEyesBoneRef.current.rotation.x) * eyeLerpSpeed;
       }
 
       hairBonesRef.current.forEach(({ bone, baseRotZ, baseRotX, phase }) => {
