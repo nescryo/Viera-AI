@@ -177,6 +177,25 @@ class TTSService {
     }
   }
 
+  public prepareTextForSpeech(text: string): string {
+    if (!text) return '';
+    let result = text;
+    // Extract <ja> tag content if present
+    const jaMatch = /<ja>([\s\S]*?)<\/ja>/i.exec(text);
+    if (jaMatch && jaMatch[1].trim()) {
+      result = jaMatch[1].trim();
+    }
+    return result
+      .replace(/<[^>]+>/g, '')
+      .replace(/\*.*?\*/g, '')
+      .replace(/\[.*?\]/g, '')
+      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+      .replace(/[`#~_>]/g, '')
+      .replace(/[\r\n]+/g, '、') // Replace newlines with Japanese comma so Fish Audio doesn't cut off mid-text!
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   public speak(
     text: string, 
     persona: Persona, 
@@ -187,26 +206,11 @@ class TTSService {
   ) {
     this.stop();
 
-    // Clean action asterisks (*actions*), emotion tags ([emotion]), markdown artifacts, and emojis for speech output
-    const cleanText = text
-      .replace(/\*.*?\*/g, '')
-      .replace(/\[.*?\]/g, '')
-      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
-      .replace(/[`#~_>]/g, '')
-      .trim();
+    const targetText = this.prepareTextForSpeech(text);
 
-    if (!cleanText) {
+    if (!targetText) {
       if (onEnd) onEnd();
       return;
-    }
-
-    let targetText = cleanText;
-    // Check if cleanText is English and exists in originalJaTextCache
-    if (!/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(cleanText)) {
-      const cachedJa = this.originalJaTextCache.get(cleanText.toLowerCase());
-      if (cachedJa) {
-        targetText = cachedJa;
-      }
     }
 
     const ttsProvider = apiConfig?.ttsProvider || 'voicevox';
@@ -940,12 +944,21 @@ class TTSService {
     }
 
     try {
-      // Auto translate English text to Japanese for authentic anime dubbing if Japanese voice model is selected
-      const jaText = await this.translateToJapanese(text);
+      // Use exact Japanese text prepared from LLM output (flattened, no newlines causing truncation)
+      const jaText = this.prepareTextForSpeech(text);
       if (currentSessionId !== this.currentSpeechSessionId) return;
 
+      // Ironclad Language Guardrail: Ensure text sent to Fish Audio is ALWAYS valid Japanese so Firefly's Fish Audio voice is ALWAYS preserved!
+      let validJaText = jaText;
+      const hasJapaneseChars = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(jaText);
+      if (!hasJapaneseChars) {
+        console.warn("[Viera TTS Guardrail] Text contains no Japanese Kana/Kanji. Auto-converting to Japanese so Firefly's Fish Audio voice stays active:", text);
+        validJaText = await this.translateToJapanese(jaText);
+        if (currentSessionId !== this.currentSpeechSessionId) return;
+      }
+
       const emotion = this.detectEmotionFromText(text);
-      let synthText = jaText;
+      let synthText = validJaText;
       if (emotion === 'whisper') {
         synthText = `[whisper] ${jaText}`;
       } else if (emotion === 'tsundere' || emotion === 'teasing') {
