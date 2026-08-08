@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { ChatMessage, Persona, ApiConfig, UserProfile, ChatSession } from './types';
 import { FIREFLY_PERSONA } from './data/personas';
-import { sendStreamingChatMessage, parseResponseText } from './services/aiService';
+import { sendStreamingChatMessage, parseResponseText, parseDualOutputResponse } from './services/aiService';
 import { ttsService } from './services/ttsService';
 import { getCurrentUser, saveCurrentUser, logoutUser } from './services/authService';
 import * as historyService from './services/historyService';
@@ -254,11 +254,14 @@ export function App() {
         if (!updateFrameId) {
           updateFrameId = requestAnimationFrame(() => {
             updateFrameId = null;
-            const { emotions: currEmotions, actions: currActions } = parseResponseText(latestText);
+            const { emotions: currEmotions, actions: currActions, enText, jaText } = parseDualOutputResponse(latestText);
+            const emotionHeader = currEmotions.length > 0 ? `[${currEmotions[0]}] ` : '';
+            const actionHeader = currActions.length > 0 ? `*${currActions[0]}* ` : '';
+            const displayText = `${emotionHeader}${actionHeader}${enText || latestText}`;
             setMessages((prev) => {
               const next = prev.map((msg) =>
                 msg.id === aiMsgId
-                  ? { ...msg, text: latestText, emotions: currEmotions, actions: currActions }
+                  ? { ...msg, text: displayText, originalText: jaText || latestText, emotions: currEmotions, actions: currActions }
                   : msg
               );
               if (userProfile && activeSessionId) {
@@ -269,21 +272,27 @@ export function App() {
           });
         }
       },
-      (fullText, emotions, actions) => {
+      (fullText) => {
         if (updateFrameId) {
           cancelAnimationFrame(updateFrameId);
           updateFrameId = null;
         }
         setIsLoading(false);
+        const { emotions, actions, jaText, enText } = parseDualOutputResponse(fullText);
         const activeEmotion = emotions[0] || 'happy';
         setCurrentEmotion(activeEmotion);
+
+        const emotionHeader = emotions.length > 0 ? `[${emotions[0]}] ` : '';
+        const actionHeader = actions.length > 0 ? `*${actions[0]}* ` : '';
+        const uiDisplayText = `${emotionHeader}${actionHeader}${enText}`;
 
         const finalMsg: ChatMessage = {
           id: aiMsgId,
           sender: 'ai',
           characterId: currentPersona.id,
-          text: fullText,
-          originalText: fullText,
+          text: uiDisplayText,
+          originalText: jaText,
+          rawText: fullText,
           emotions,
           actions,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -298,27 +307,6 @@ export function App() {
         });
 
         speakMessage(finalMsg);
-
-        if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(fullText)) {
-          ttsService.translateJapaneseToEnglish(fullText).then((enSub) => {
-            if (enSub && enSub !== fullText) {
-              const { emotions: currEmotions, actions: currActions } = parseResponseText(fullText);
-              const emotionPrefix = currEmotions.length > 0 ? `[${currEmotions[0]}] ` : '';
-              const actionPrefix = currActions.length > 0 ? `*${currActions[0]}* ` : '';
-              const englishOnlyText = `${emotionPrefix}${actionPrefix}${enSub}`;
-
-              setMessages((prev) => {
-                const next = prev.map((msg) =>
-                  msg.id === aiMsgId ? { ...msg, text: englishOnlyText, originalText: fullText } : msg
-                );
-                if (userProfile && activeSessionId) {
-                  historyService.updateSessionMessages(userProfile.id, activeSessionId, next);
-                }
-                return next;
-              });
-            }
-          });
-        }
       },
       (err) => {
         if (updateFrameId) {
@@ -407,11 +395,14 @@ export function App() {
         if (!updateFrameId) {
           updateFrameId = requestAnimationFrame(() => {
             updateFrameId = null;
-            const { emotions: currEmotions, actions: currActions } = parseResponseText(latestText);
+            const { emotions: currEmotions, actions: currActions, enText, jaText } = parseDualOutputResponse(latestText);
+            const emotionHeader = currEmotions.length > 0 ? `[${currEmotions[0]}] ` : '';
+            const actionHeader = currActions.length > 0 ? `*${currActions[0]}* ` : '';
+            const displayText = `${emotionHeader}${actionHeader}${enText || latestText}`;
             setMessages((prev) => {
               const next = prev.map((msg) =>
                 msg.id === aiMsgId
-                  ? { ...msg, text: latestText, emotions: currEmotions, actions: currActions }
+                  ? { ...msg, text: displayText, originalText: jaText || latestText, emotions: currEmotions, actions: currActions }
                   : msg
               );
               if (userProfile && activeSessionId) {
@@ -422,21 +413,27 @@ export function App() {
           });
         }
       },
-      (fullText, emotions, actions) => {
+      (fullText) => {
         if (updateFrameId) {
           cancelAnimationFrame(updateFrameId);
           updateFrameId = null;
         }
         setIsLoading(false);
+        const { emotions, actions, jaText, enText } = parseDualOutputResponse(fullText);
         const activeEmotion = emotions[0] || 'happy';
         setCurrentEmotion(activeEmotion);
+
+        const emotionHeader = emotions.length > 0 ? `[${emotions[0]}] ` : '';
+        const actionHeader = actions.length > 0 ? `*${actions[0]}* ` : '';
+        const uiDisplayText = `${emotionHeader}${actionHeader}${enText}`;
 
         const finalMsg: ChatMessage = {
           id: aiMsgId,
           sender: 'ai',
           characterId: currentPersona.id,
-          text: fullText,
-          originalText: fullText,
+          text: uiDisplayText,
+          originalText: jaText,
+          rawText: fullText,
           emotions,
           actions,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -451,27 +448,6 @@ export function App() {
         });
 
         speakMessage(finalMsg);
-
-        if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(fullText)) {
-          ttsService.translateJapaneseToEnglish(fullText).then((enSub) => {
-            if (enSub && enSub !== fullText) {
-              const { emotions: currEmotions, actions: currActions } = parseResponseText(fullText);
-              const emotionPrefix = currEmotions.length > 0 ? `[${currEmotions[0]}] ` : '';
-              const actionPrefix = currActions.length > 0 ? `*${currActions[0]}* ` : '';
-              const englishOnlyText = `${emotionPrefix}${actionPrefix}${enSub}`;
-
-              setMessages((prev) => {
-                const next = prev.map((msg) =>
-                  msg.id === aiMsgId ? { ...msg, text: englishOnlyText, originalText: fullText } : msg
-                );
-                if (userProfile && activeSessionId) {
-                  historyService.updateSessionMessages(userProfile.id, activeSessionId, next);
-                }
-                return next;
-              });
-            }
-          });
-        }
       },
       (err) => {
         if (updateFrameId) {

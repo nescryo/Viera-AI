@@ -17,6 +17,50 @@ export function parseResponseText(text: string) {
   return { emotions, actions };
 }
 
+export interface ParsedDualOutput {
+  emotions: string[];
+  actions: string[];
+  jaText: string;
+  enText: string;
+}
+
+export function parseDualOutputResponse(text: string): ParsedDualOutput {
+  const { emotions, actions } = parseResponseText(text);
+
+  const jaMatches: string[] = [];
+  const jaRegex = /<ja>([\s\S]*?)<\/ja>/gi;
+  let match;
+  while ((match = jaRegex.exec(text)) !== null) {
+    if (match[1].trim()) jaMatches.push(match[1].trim());
+  }
+
+  const enMatches: string[] = [];
+  const enRegex = /<en>([\s\S]*?)<\/en>/gi;
+  while ((match = enRegex.exec(text)) !== null) {
+    if (match[1].trim()) enMatches.push(match[1].trim());
+  }
+
+  let jaText = jaMatches.join(' ');
+  let enText = enMatches.join(' ');
+
+  // Fallback parsing if LLM forgot <ja> or <en> tags
+  if (!jaText && !enText) {
+    const cleanText = text
+      .replace(/\[.*?\]/g, '')
+      .replace(/\*.*?\*/g, '')
+      .trim();
+
+    jaText = cleanText;
+    enText = cleanText;
+  } else if (!jaText) {
+    jaText = enText;
+  } else if (!enText) {
+    enText = jaText;
+  }
+
+  return { emotions, actions, jaText, enText };
+}
+
 /**
  * Formats user's display name and honorific based on profile & gender preferences:
  * - male -> "-san" (e.g. Yokoyama-san)
@@ -132,10 +176,20 @@ export async function sendStreamingChatMessage(
 ): Promise<void> {
   const formattedUserName = getUserFormattedName(userProfile);
 
-  const formattedHistory = messages.map(m => ({
-    role: m.sender === 'user' ? 'user' : 'assistant',
-    content: m.text
-  }));
+  const formattedHistory = messages.map(m => {
+    if (m.sender === 'user') {
+      return { role: 'user', content: m.text };
+    }
+    if (m.rawText) {
+      return { role: 'assistant', content: m.rawText };
+    }
+    const emotionHeader = m.emotions && m.emotions.length > 0 ? `[${m.emotions[0]}] ` : '';
+    const actionHeader = m.actions && m.actions.length > 0 ? `*${m.actions[0]}* ` : '';
+    const jaContent = m.originalText || m.text;
+    const enContent = m.text.replace(/\[.*?\]/g, '').replace(/\*.*?\*/g, '').trim();
+    const reconstructed = `${emotionHeader}${actionHeader}\n<ja>${jaContent}</ja>\n<en>${enContent}</en>`;
+    return { role: 'assistant', content: reconstructed };
+  });
 
   const systemMessage = {
     role: 'system',
@@ -171,7 +225,7 @@ Maintain character at all times. Use asterisks for actions like *smiles* or *ges
           model: apiConfig.deepseekModel || 'deepseek-chat',
           messages: [systemMessage, ...formattedHistory],
           temperature: 0.8,
-          max_tokens: 300,
+          max_tokens: 800,
           stream: true
         }),
         signal: controller.signal
@@ -213,7 +267,7 @@ Maintain character at all times. Use asterisks for actions like *smiles* or *ges
           model: apiConfig.lmStudioModel || 'local-model',
           messages: [systemMessage, ...formattedHistory],
           temperature: 0.8,
-          max_tokens: 250,
+          max_tokens: 800,
           stream: true
         }),
         signal: controller.signal
